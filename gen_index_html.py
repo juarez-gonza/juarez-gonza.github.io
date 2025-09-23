@@ -1,41 +1,54 @@
 import os
-import re
 from datetime import datetime
+import re
 
+PRE_POSTS_DIR = "pre-posts"
 POSTS_DIR = "posts"
 OUTPUT_FILE = "index.html"
 
-# Regex to grab <title> and <meta name="date" content="YYYY-MM-DD">
-TITLE_RE = re.compile(r"<title>(.*?)</title>", re.IGNORECASE | re.DOTALL)
-DATE_RE = re.compile(r'<meta\s+name="date"\s+content="([\d-]+)"', re.IGNORECASE)
-
 posts = []
 
-for fname in os.listdir(POSTS_DIR):
+for fname in os.listdir(PRE_POSTS_DIR):
     if not fname.endswith(".html"):
         continue
-    path = os.path.join(POSTS_DIR, fname)
+
+    path = os.path.join(PRE_POSTS_DIR, fname)
     with open(path, encoding="utf-8") as f:
-        text = f.read()
+        lines = f.readlines()
 
-    title_match = TITLE_RE.search(text)
-    date_match = DATE_RE.search(text)
+    # Skip empty lines
+    meaningful = [l.strip() for l in lines if l.strip()]
 
-    title = title_match.group(1).strip() if title_match else fname
-    date_str = date_match.group(1) if date_match else "1970-01-01"
-    date = datetime.strptime(date_str, "%Y-%m-%d")
+    if len(meaningful) < 2:
+        raise ValueError(f"{fname} does not have enough lines for title/date")
+
+    # First line: <h1 id="title">Post Title</h1>
+    title_match = re.match(r'<h1\s+id="title">(.*)</h1>', meaningful[0])
+    if not title_match:
+        raise ValueError(f"{fname}: First line must be <h1 id='title'>Title</h1>")
+    title = title_match.group(1).strip()
+
+    # Second line: <p class="date">YYYY-MM-DD</p>
+    date_match = re.match(r'<p\s+class="date">([\d-]+)</p>', meaningful[1])
+    if not date_match:
+        raise ValueError(f"{fname}: Second line must be <p class='date'>YYYY-MM-DD</p>")
+    date_str = date_match.group(1)
+    try:
+        date = datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError(f"{fname}: Date not in YYYY-MM-DD format")
 
     posts.append({
         "title": title,
         "date": date,
         "date_str": date_str,
-        "url": f"{POSTS_DIR}/{fname}"
+        "url": f"posts/{fname}"
     })
 
-# Sort by date, newest first
+# Sort by date descending
 posts.sort(key=lambda p: p["date"], reverse=True)
 
-# Generate HTML
+# Generate index.html
 html = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,6 +67,7 @@ html = """<!DOCTYPE html>
     <h2>Posts</h2>
     <ul>
 """
+
 for post in posts:
     html += f'      <li><a href="{post["url"]}">{post["title"]}</a> <small>({post["date_str"]})</small></li>\n'
 
