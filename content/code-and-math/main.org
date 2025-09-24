@@ -1,0 +1,10 @@
+#+title: Some math and code
+
+\begin{equation}                        % arbitrary environments,
+x=\sqrt{b}                              % even tables, figures, etc
+\end{equation}
+
+If $a^2=b$ and \( b=2 \), then the solution must be
+either $$ a=+\sqrt{2} $$ or \[ a=-\sqrt{2}. \]
+
+#+include: ./main.cpp src c++ :lines "3-6"
