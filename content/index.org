@@ -1,8 +1,21 @@
-#+title: Org Mode Example Site
+#+title: O777
 
-* Overview
+* What is this?
 
-This is an *example* of a _website_ written with [[https://orgmode.org][Org Mode]]!
+This is a work-in-progress blog where I intend to upload stuff I do not know
+where to communicate otherwise. Most (all?) of this stuff will be programming and
+math related.
 
-Here is a link to some math and code [[./code-and-math/main.org][Code and math example]]
+* Who am I?
 
+Is that information needed?
+
+* What's with the title
+
+It comes from the song 'Obertura 777 - La Máquina de Hacer Pájaros'.
+
+* Blog Index
+
+This should be populated some day...
+
+[[./blog-example/main.org][Blog example]]
