@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Empathising with C++20 coroutines</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
+</head>
+<body>
+<div id="content" class="content">
+<h1 class="title">Empathising with C++20 coroutines</h1>
+<div id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org66d257b">What is this about?</a></li>
+<li><a href="#orgf1fefaf">Divulging C++20 coroutines introductions</a></li>
+<li><a href="#org8e1a82e"><span class="todo TODO">TODO</span> What c++20 coroutines are not</a>
+<ul>
+<li><a href="#orgec4f43b"><span class="todo TODO">TODO</span> From coroutines to callbacks and the other way around</a></li>
+</ul>
+</li>
+<li><a href="#orge620f4c"><span class="todo TODO">TODO</span> Empathising with c++20 coroutines</a></li>
+<li><a href="#org03403e5"><span class="todo TODO">TODO</span> Conclusions</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org66d257b" class="outline-2">
+<h2 id="org66d257b">What is this about?</h2>
+<div class="outline-text-2" id="text-org66d257b">
+<p>
+A couple of years ago I wrote some slides for a course on the underlying
+principles and decisions behind C++20 coroutines (or at least my intepretation
+of these). This happened around the same time I was finishing my undergrad, so
+it got mixed with life and never saw light. Now that I have some time I will
+try to put these ideas somewhere.
+</p>
+
+<p>
+C++20 coroutines is one of those things in C++ that gets (not) praised by its seemingly
+complex design and the understanding it requires from its users. Luckily nowadays its
+users do not have to implement the <code>promise_​type</code> because a library may have
+already done it (and that library may be <a href="https://www.boost.org/doc/libs/1_89_0/doc/html/boost_asio.html">asio</a>). Still, I want to <b>empathise</b> with the
+design of C++20 coroutines. This post is an attempt to convince myself of why each part of its API is
+<b>needed</b>, and maybe think about how it could have been simplified while retaining its power.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf1fefaf" class="outline-2">
+<h2 id="orgf1fefaf">Divulging C++20 coroutines introductions</h2>
+<div class="outline-text-2" id="text-orgf1fefaf">
+<p>
+I have not read posts or seen many talks about C++20 coroutines since I first thought
+about this post, so the contents of this paragraph may no longer apply.
+My impression at the time was that many introductions to the topic did not do a good job for 2 reasons:
+</p>
+
+<ol class="org-ol">
+<li><b>Overloading</b>: Many seemed to try to explain asynchoronous programming in parallel
+(pun intended) to the C++20 coroutines mechanism. Both topics are complex by themselves,
+explaining them without a clear distinction seems like a bad idea.</li>
+<li><p>
+<b>Focus on implementation details</b>:
+</p>
+<ul class="org-ul">
+<li>"Activation/Coroutine frame",</li>
+<li>"heap",</li>
+<li>"heap ellision",</li>
+<li>"A coroutine is a state machine that&#x2026;".</li>
+</ul>
+<p>
+You could define a coroutine in those terms. Is that level of abstraction useful
+at an introduction level? I think not.
+</p></li>
+</ol>
+
+<p>
+The former issue is easier to solve. Simply <i>advertise</i> that basic knowledge about continuations
+and asynchronous programming is required, provide sources if adequate. Here are some resources
+I like, most of them are LISP based (in particular Scheme flavours)
+</p>
+<ul class="org-ul">
+<li><a href="https://docs.racket-lang.org/reference/eval-model.html?q=continuation#(part._cont-model)">Sub-expression evaluation and Continuations</a> and <a href="https://docs.racket-lang.org/reference/eval-model.html?q=continuation#(part._.Tail_.Position)">Tail Position</a> sections of the Racket evaluation
+model does a very good, succint job at the core idea of a continuation.</li>
+<li><a href="https://dl.acm.org/doi/abs/10.1145/800055.802046">Continuations and coroutines</a> shows how coroutines can be implemented via first class continuations
+(<code>call/cc</code>). No need to follow every detail, but just to see how continuations are really
+behind all of this. It is then easier to recognise callbacks and coroutines as forms of continuations and
+go back and forth between them, according to whatever suits best to your way of thinking.</li>
+<li><a href="https://dl.acm.org/doi/10.1145/1462166.1462167">Revisiting coroutines</a> explains the most prevalent classifications of coroutines (stackless/stackful,
+symmetric/asymmetric). Just so that you know what people means when they say C++20 coroutines are
+stackless and asymmetric.</li>
+</ul>
+
+<p>
+Consider yourself advertised, I wont go that much into what a continuation is <sup><a id="fnr.1" class="footref" href="#fn.1" role="doc-backlink">1</a></sup>.
+</p>
+
+<p>
+The latter issue is tough to avoid, because implementation details do pop up quite a bit in the API of
+the <code>promise_​type</code> itself. To tackle this I will try to motivate on a case-by-case basis why each detail
+popping up in the API is necessary. The underlying reason will always be the same: C++
+is a performance oriented language, if the API were to miss an optimisation opportunity that is
+otherwise present in the underlying implementation, then C++ users would not care about the feature.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8e1a82e" class="outline-2">
+<h2 id="org8e1a82e"><span class="todo TODO">TODO</span> What c++20 coroutines are not</h2>
+<div class="outline-text-2" id="text-org8e1a82e">
+</div>
+<div id="outline-container-orgec4f43b" class="outline-3">
+<h3 id="orgec4f43b"><span class="todo TODO">TODO</span> From coroutines to callbacks and the other way around</h3>
+</div>
+</div>
+
+<div id="outline-container-orge620f4c" class="outline-2">
+<h2 id="orge620f4c"><span class="todo TODO">TODO</span> Empathising with c++20 coroutines</h2>
+<div class="outline-text-2" id="text-orge620f4c">
+<p>
+loootttss of subsections
+</p>
+</div>
+</div>
+
+<div id="outline-container-org03403e5" class="outline-2">
+<h2 id="org03403e5"><span class="todo TODO">TODO</span> Conclusions</h2>
+<div class="outline-text-2" id="text-org03403e5">
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" class="footnum" href="#fnr.1" role="doc-backlink">1</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+I would like to make a post explaining continuations and how these can be recognised, but we will see
+how that goes.
+</p></div></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="creator"><a href="https://www.gnu.org/software/emacs/">Emacs</a> 29.3 (<a href="https://orgmode.org">Org</a> mode 9.6.15)</p>
+</div>
+</body>
+</html>
