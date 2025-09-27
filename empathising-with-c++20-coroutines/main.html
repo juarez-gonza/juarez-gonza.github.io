@@ -16,22 +16,22 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org66d257b">What is this about?</a></li>
-<li><a href="#orgf1fefaf">Divulging C++20 coroutines introductions</a></li>
-<li><a href="#org8e1a82e"><span class="todo TODO">TODO</span> What c++20 coroutines are not</a>
+<li><a href="#org65f1de0">What is this about?</a></li>
+<li><a href="#orge91efea">Divulging C++20 coroutines introductions</a></li>
+<li><a href="#org0236c94"><span class="todo TODO">TODO</span> What c++20 coroutines are not</a>
 <ul>
-<li><a href="#orgec4f43b"><span class="todo TODO">TODO</span> From coroutines to callbacks and the other way around</a></li>
+<li><a href="#org003a009"><span class="todo TODO">TODO</span> From coroutines to callbacks and the other way around</a></li>
 </ul>
 </li>
-<li><a href="#orge620f4c"><span class="todo TODO">TODO</span> Empathising with c++20 coroutines</a></li>
-<li><a href="#org03403e5"><span class="todo TODO">TODO</span> Conclusions</a></li>
+<li><a href="#orgf22a66e"><span class="todo TODO">TODO</span> Empathising with c++20 coroutines</a></li>
+<li><a href="#orgdab8b2e"><span class="todo TODO">TODO</span> Conclusions</a></li>
 </ul>
 </div>
 </div>
 
-<div id="outline-container-org66d257b" class="outline-2">
-<h2 id="org66d257b">What is this about?</h2>
-<div class="outline-text-2" id="text-org66d257b">
+<div id="outline-container-org65f1de0" class="outline-2">
+<h2 id="org65f1de0">What is this about?</h2>
+<div class="outline-text-2" id="text-org65f1de0">
 <p>
 A couple of years ago I wrote some slides for a course on the underlying
 principles and decisions behind C++20 coroutines (or at least my intepretation
@@ -43,7 +43,7 @@ try to put these ideas somewhere.
 <p>
 C++20 coroutines is one of those things in C++ that gets (not) praised by its seemingly
 complex design and the understanding it requires from its users. Luckily nowadays its
-users do not have to implement the <code>promise_​type</code> because a library may have
+users do not have to implement the <code>promise_type</code> because a library may have
 already done it (and that library may be <a href="https://www.boost.org/doc/libs/1_89_0/doc/html/boost_asio.html">asio</a>). Still, I want to <b>empathise</b> with the
 design of C++20 coroutines. This post is an attempt to convince myself of why each part of its API is
 <b>needed</b>, and maybe think about how it could have been simplified while retaining its power.
@@ -51,9 +51,9 @@ design of C++20 coroutines. This post is an attempt to convince myself of why ea
 </div>
 </div>
 
-<div id="outline-container-orgf1fefaf" class="outline-2">
-<h2 id="orgf1fefaf">Divulging C++20 coroutines introductions</h2>
-<div class="outline-text-2" id="text-orgf1fefaf">
+<div id="outline-container-orge91efea" class="outline-2">
+<h2 id="orge91efea">Divulging C++20 coroutines introductions</h2>
+<div class="outline-text-2" id="text-orge91efea">
 <p>
 I have not read posts or seen many talks about C++20 coroutines since I first thought
 about this post, so the contents of this paragraph may no longer apply.
@@ -102,7 +102,7 @@ Consider yourself advertised, I wont go that much into what a continuation is <s
 
 <p>
 The latter issue is tough to avoid, because implementation details do pop up quite a bit in the API of
-the <code>promise_​type</code> itself. To tackle this I will try to motivate on a case-by-case basis why each detail
+the <code>promise_type</code> itself. To tackle this I will try to motivate on a case-by-case basis why each detail
 popping up in the API is necessary. The underlying reason will always be the same: C++
 is a performance oriented language, if the API were to miss an optimisation opportunity that is
 otherwise present in the underlying implementation, then C++ users would not care about the feature.
@@ -110,27 +110,27 @@ otherwise present in the underlying implementation, then C++ users would not car
 </div>
 </div>
 
-<div id="outline-container-org8e1a82e" class="outline-2">
-<h2 id="org8e1a82e"><span class="todo TODO">TODO</span> What c++20 coroutines are not</h2>
-<div class="outline-text-2" id="text-org8e1a82e">
+<div id="outline-container-org0236c94" class="outline-2">
+<h2 id="org0236c94"><span class="todo TODO">TODO</span> What c++20 coroutines are not</h2>
+<div class="outline-text-2" id="text-org0236c94">
 </div>
-<div id="outline-container-orgec4f43b" class="outline-3">
-<h3 id="orgec4f43b"><span class="todo TODO">TODO</span> From coroutines to callbacks and the other way around</h3>
+<div id="outline-container-org003a009" class="outline-3">
+<h3 id="org003a009"><span class="todo TODO">TODO</span> From coroutines to callbacks and the other way around</h3>
 </div>
 </div>
 
-<div id="outline-container-orge620f4c" class="outline-2">
-<h2 id="orge620f4c"><span class="todo TODO">TODO</span> Empathising with c++20 coroutines</h2>
-<div class="outline-text-2" id="text-orge620f4c">
+<div id="outline-container-orgf22a66e" class="outline-2">
+<h2 id="orgf22a66e"><span class="todo TODO">TODO</span> Empathising with c++20 coroutines</h2>
+<div class="outline-text-2" id="text-orgf22a66e">
 <p>
 loootttss of subsections
 </p>
 </div>
 </div>
 
-<div id="outline-container-org03403e5" class="outline-2">
-<h2 id="org03403e5"><span class="todo TODO">TODO</span> Conclusions</h2>
-<div class="outline-text-2" id="text-org03403e5">
+<div id="outline-container-orgdab8b2e" class="outline-2">
+<h2 id="orgdab8b2e"><span class="todo TODO">TODO</span> Conclusions</h2>
+<div class="outline-text-2" id="text-orgdab8b2e">
 </div>
 </div>
 <div id="footnotes">
