@@ -1,21 +1,17 @@
-#+title: O777
+#+title: Page fault making machine
 
 * What is this?
 
 This is a work-in-progress blog where I intend to upload stuff I do not know
-where to communicate otherwise. Most (all?) of this stuff will be programming and
+where to communicate otherwise. Most (all?) of this stuff will be programming and/or
 math related.
 
 * Who am I?
 
-Is that information needed?
-
-* What's with the title
-
-It comes from the song 'Obertura 777 - La Máquina de Hacer Pájaros'.
+I am a programmer (mostly C++) and I like math.
 
 * Blog Index
 
 This should be populated some day...
 
-[[./blog-example/main.org][Blog example]]
+[[./empathising-with-c++20-coroutines/main.org][Empathising with C++20 coroutines]]

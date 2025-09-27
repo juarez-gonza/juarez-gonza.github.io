@@ -1,0 +1,85 @@
+#+options: ^:{}
+#+title: Empathising with C++20 coroutines
+
+* What is this about?
+
+A couple of years ago I wrote some slides for a course on the underlying
+principles and decisions behind C++20 coroutines (or at least my intepretation
+of these). This happened around the same time I was finishing my undergrad, so
+it got mixed with life and never saw light. Now that I have some time I will
+try to put these ideas somewhere.
+
+C++20 coroutines is one of those things in C++ that gets (not) praised by its seemingly
+complex design and the understanding it requires from its users. Luckily nowadays its
+users do not have to implement the =promise_​type= because a library may have
+already done it (and that library may be [[https://www.boost.org/doc/libs/1_89_0/doc/html/boost_asio.html][asio]]). Still, I want to *empathise* with the
+design of C++20 coroutines. This post is an attempt to convince myself of why each part of its API is
+*needed*, and maybe think about how it could have been simplified while retaining its power.
+
+* Divulging C++20 coroutines introductions
+
+I have not read posts or seen many talks about C++20 coroutines since I first thought
+about this post, so the contents of this paragraph may no longer apply.
+My impression at the time was that many introductions to the topic did not do a good job for 2 reasons:
+
+1. *Overloading*: Many seemed to try to explain asynchoronous programming in parallel
+   (pun intended) to the C++20 coroutines mechanism. Both topics are complex by themselves,
+   explaining them without a clear distinction seems like a bad idea.
+2. *Focus on implementation details*:
+   + "Activation/Coroutine frame",
+   + "heap",
+   + "heap ellision",
+   + "A coroutine is a state machine that...".
+   You could define a coroutine in those terms. Is that level of abstraction useful
+   at an introduction level? I think not.
+
+The former issue is easier to solve. Simply /advertise/ that basic knowledge about continuations
+and asynchronous programming is required, provide sources if adequate. Here are some resources
+I like, most of them are LISP based (in particular Scheme flavours)
++ [[https://docs.racket-lang.org/reference/eval-model.html?q=continuation#(part._cont-model)][Sub-expression evaluation and Continuations]] and [[https://docs.racket-lang.org/reference/eval-model.html?q=continuation#(part._.Tail_.Position)][Tail Position]] sections of the Racket evaluation
+  model does a very good, succint job at the core idea of a continuation.
++ [[https://dl.acm.org/doi/abs/10.1145/800055.802046][Continuations and coroutines]] shows how coroutines can be implemented via first class continuations
+  (=call/cc=). No need to follow every detail, but just to see how continuations are really
+  behind all of this. It is then easier to recognise callbacks and coroutines as forms of continuations and
+  go back and forth between them, according to whatever suits best to your way of thinking.
++ [[https://dl.acm.org/doi/10.1145/1462166.1462167][Revisiting coroutines]] explains the most prevalent classifications of coroutines (stackless/stackful,
+  symmetric/asymmetric). Just so that you know what people means when they say C++20 coroutines are
+  stackless and asymmetric.
+
+Consider yourself advertised, I wont go that much into what a continuation is [fn:1].
+
+The latter issue is tough to avoid, because implementation details do pop up quite a bit in the API of
+the =promise_​type= itself. To tackle this I will try to motivate on a case-by-case basis why each detail
+popping up in the API is necessary. The underlying reason will always be the same: C++
+is a performance oriented language, if the API were to miss an optimisation opportunity that is
+otherwise present in the underlying implementation, then C++ users would not care about the feature.
+
+* TODO What c++20 coroutines are not
+
+** TODO From coroutines to callbacks and the other way around
+
+* TODO Empathising with c++20 coroutines
+
+loootttss of subsections
+
+* TODO Conclusions
+
+# * i may have something to write about in the future...
+
+# ** latex math
+
+# \begin{equation}                        % arbitrary environments,
+# x=\sqrt{b}                              % even tables, figures, etc
+# \end{equation}
+
+# if $a^2=b$ and \( b=2 \), then the solution must be
+# either $$ a=+\sqrt{2} $$ or \[ a=-\sqrt{2}. \]
+
+# ** including code from a file
+
+# #+include: ./main.cpp src c++ :lines "3-6"
+
+* Footnotes
+
+[fn:1] I would like to make a post explaining continuations and how these can be recognised, but we will see
+how that goes.
