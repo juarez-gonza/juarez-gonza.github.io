@@ -1,4 +1,4 @@
-#+options: ^:{}
+#+options: ^:nil
 #+title: Empathising with C++20 coroutines
 
 * What is this about?
@@ -11,7 +11,7 @@ try to put these ideas somewhere.
 
 C++20 coroutines is one of those things in C++ that gets (not) praised by its seemingly
 complex design and the understanding it requires from its users. Luckily nowadays its
-users do not have to implement the =promise_​type= because a library may have
+users do not have to implement the =promise_type= because a library may have
 already done it (and that library may be [[https://www.boost.org/doc/libs/1_89_0/doc/html/boost_asio.html][asio]]). Still, I want to *empathise* with the
 design of C++20 coroutines. This post is an attempt to convince myself of why each part of its API is
 *needed*, and maybe think about how it could have been simplified while retaining its power.
@@ -49,7 +49,7 @@ I like, most of them are LISP based (in particular Scheme flavours)
 Consider yourself advertised, I wont go that much into what a continuation is [fn:1].
 
 The latter issue is tough to avoid, because implementation details do pop up quite a bit in the API of
-the =promise_​type= itself. To tackle this I will try to motivate on a case-by-case basis why each detail
+the =promise_type= itself. To tackle this I will try to motivate on a case-by-case basis why each detail
 popping up in the API is necessary. The underlying reason will always be the same: C++
 is a performance oriented language, if the API were to miss an optimisation opportunity that is
 otherwise present in the underlying implementation, then C++ users would not care about the feature.
