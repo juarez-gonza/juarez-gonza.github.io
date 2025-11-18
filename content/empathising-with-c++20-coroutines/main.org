@@ -15,8 +15,8 @@ somewhere.
 C++20 coroutines is one of those things in C++ that gets (not) praised
 by its seemingly complex design and the understanding it requires from
 its users. Luckily nowadays its users do not have to implement the
-difficult difficult part (the =promise_type=) because a library may have
-already done it (for most users, that library may be [[https://www.boost.org/doc/libs/1_89_0/doc/html/boost_asio.html][asio]]).
+difficult part (the =promise_type=) because a library may have already
+done it (for most users, that library may be [[https://www.boost.org/doc/libs/1_89_0/doc/html/boost_asio.html][asio]]).
 
 
 Still, in this post I want to *empathise* with the design of C++20
