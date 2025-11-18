@@ -31,8 +31,8 @@ expressive power.
 I have not read posts or seen many talks about C++20 coroutines since
 I first thought about this post, so the contents of this paragraph may
 no longer apply.  My impression at the time was that many
-introductions to the topic did not work as good as they could for 2
-common pitfalls:
+introductions to the topic did not work as good as they could because
+of two common pitfalls:
 
 
 1. *Content overloading*: Many seemed to try to explain asynchoronous
