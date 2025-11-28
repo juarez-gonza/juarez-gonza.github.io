@@ -89,20 +89,115 @@ is already acquainted with.
 
 + *"Hey! These coroutines are nothing like those in Lua, Go, nor
   Javascript!"*: That is right. C++20 coroutines follow their own
-  approach, with some similar aspects to other languages' coroutines,
-  but many differences[fn:2].
-+ *"Are =std::promise= and coroutine's =promise_type= related?"*: No, this
+  approach. Some aspects may be familiar to you from other languages,
+  but in general you should expect many differences with C++20
+  coroutines[fn:2].
++ *"Are =std::promise= and a coroutine's =promise_type= related?"*: No, this
   is yet another C++ misnomer.
-+ *"When do threads come into play?"*: Think about callbacks, do
-  callbacks have any concurrency/threading by themselves? No! However
-  /task queues/ of callbacks can be constructed. These task queues may
-  be concurrently accessed by many threads. Something analogous
-  happens with coroutines: their nature does not involve concurrency,
-  but they compose rather nicely with concurrent solutions. This post
-  deals with the guts of C++20 coroutines, so we will be ignoring the
-  concurrent aspect throughout the rest of the post.
++ *"When do threads come into play?"*: Do callbacks involve any
+  concurrency/threading by themselves? No! However /task queues/ of
+  callbacks can be constructed. These task queues may be concurrently
+  accessed by many threads. Something analogous happens with
+  coroutines: their nature does not involve concurrency, but they
+  compose rather nicely with concurrent solutions. This post deals
+  with the guts of C++20 coroutines, so we will be ignoring the
+  concurrent aspect throughout most of this post.
 
 ** TODO From coroutines to callbacks and the other way around
+
+It will be useful to roughly delineate how to convert code using C++20
+coroutines to /continuation passing style/ (CPS, fancy terminology for
+callbacks) and the other way around. CPS is consistent between
+different programming languages and better understood by the general
+public. The essentiality of some parts of the C++20 coroutines API is
+sometimes easier to see when we inspect the "equivalent" CPS code.
+
+
+Let us begin with the simple case of a coroutine without exceptions,
+=co_await= calls in a loop, nor recursion in its body.
+
+
+# #+include: ./main.cpp src c++ :lines "3-6"
+
+
+Our initial translation to CPS is quite straight forward:
+
+
+1. For each expression being awaited, write a function that takes a
+   callback as parameter.
+2. If the result of =co_await= expression is assigned to some local
+   variable, turn this local variable into the sole parameter of a new
+   function. Otherwise, create a function that does not take any
+   parameter.  This function is used as the callback parameter of the
+   function written in step 1.
+3. Everything in the coroutine body after the statement containing the
+   =co_await= expression is the body of the function created in step 2.
+
+
+Under this procedure, the preceding code translates into CPS as
+follows:
+
+
+# #+include: ./main.cpp src c++ :lines "3-6"
+
+
+Before considering the case of =co_await= calls in a loop or recursion
+in the body of a coroutine, let us deal with exceptions.
+
+
+# #+include: ./main.cpp src c++ :lines "3-6"
+
+
+Whenever a =co_await= expression may throw, steps above are
+modified as follows.
+
+
+1. For each expression being awaited
+   * If the =co_await= expression does not throw, then write a function
+     that takes one callback as parameter.
+   * Otherwise, write a function that takes two callbacks as
+     parameters. The first one for the successful case, the second one
+     for the error case.
+
+2. If the result of a =co_await= expression is assigned to some local
+   variable, turn this local variable into the sole parameter of a new
+   function. Otherwise, create a function that does not take any
+   parameter. This function is used as the (successful case) callback
+   parameter of the function written in step 1.
+
+   In addition, if the =co_await= expression may throw, then create
+   another function that takes as sole parameter an instance of a type
+   representing the exception captured in the =catch= block. This latter
+   function is used as the error case callback parameter of the
+   function written in step 1.
+
+3. Everything (within the =try= block and after the =try / catch=
+   construct until the end of the coroutine body) of a (throwing)
+   =co_await= expression is the body of the function (for the successful
+   case) created in step 2. If the =co_await= expression throws,
+   everything withing the =catch= block and after the =try / catch=
+   construct untis the end of the coroutine body is the body of the
+   function for the error case created in step 2.
+
+
+Under this procedure, the preceding code translates into CPS as
+follows:
+
+
+# #+include: ./main.cpp src c++ :lines "3-6"
+
+
+Finally, let us consider iteration and recursion with
+=co_await=. Consider the listing below.
+
+
+# #+include: ./main.cpp src c++ :lines "3-6"
+
+
+The core idea to translate this code to CPS is the same: put
+everything after =co_await= in a callback. But this time the number of
+callbacks needed (one per =co_await= execution) is not in correspondence
+with the number of =co_await= expressions written in the code.
 
 * TODO Empathising with c++20 coroutines
 
