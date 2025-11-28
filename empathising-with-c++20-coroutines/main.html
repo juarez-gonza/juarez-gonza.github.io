@@ -16,22 +16,22 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org315aad8">What is this about?</a></li>
-<li><a href="#orge17f621">Divulging C++20 coroutines introductions</a></li>
-<li><a href="#org1d14acd">Some misunderstandings about C++20 coroutines</a>
+<li><a href="#org58d7b94">What is this about?</a></li>
+<li><a href="#org13464be">Divulging C++20 coroutines introductions</a></li>
+<li><a href="#org3211089">Some misunderstandings about C++20 coroutines</a>
 <ul>
-<li><a href="#orgcf4fb10"><span class="todo TODO">TODO</span> From coroutines to callbacks and the other way around</a></li>
+<li><a href="#orgb102e94"><span class="todo TODO">TODO</span> From coroutines to callbacks and the other way around</a></li>
 </ul>
 </li>
-<li><a href="#org1d38eb7"><span class="todo TODO">TODO</span> Empathising with c++20 coroutines</a></li>
-<li><a href="#org8f6a54d"><span class="todo TODO">TODO</span> Conclusions</a></li>
+<li><a href="#org997ea7d"><span class="todo TODO">TODO</span> Empathising with c++20 coroutines</a></li>
+<li><a href="#orge40e8c0"><span class="todo TODO">TODO</span> Conclusions</a></li>
 </ul>
 </div>
 </div>
 
-<div id="outline-container-org315aad8" class="outline-2">
-<h2 id="org315aad8">What is this about?</h2>
-<div class="outline-text-2" id="text-org315aad8">
+<div id="outline-container-org58d7b94" class="outline-2">
+<h2 id="org58d7b94">What is this about?</h2>
+<div class="outline-text-2" id="text-org58d7b94">
 <p>
 A couple of years ago I wrote some slides for a course on the
 underlying principles and decisions behind C++20 coroutines (or at
@@ -61,9 +61,9 @@ expressive power.
 </div>
 </div>
 
-<div id="outline-container-orge17f621" class="outline-2">
-<h2 id="orge17f621">Divulging C++20 coroutines introductions</h2>
-<div class="outline-text-2" id="text-orge17f621">
+<div id="outline-container-org13464be" class="outline-2">
+<h2 id="org13464be">Divulging C++20 coroutines introductions</h2>
+<div class="outline-text-2" id="text-org13464be">
 <p>
 I have not read posts or seen many talks about C++20 coroutines since
 I first thought about this post, so the contents of this paragraph may
@@ -134,9 +134,9 @@ adequate motivation.
 </div>
 </div>
 
-<div id="outline-container-org1d14acd" class="outline-2">
-<h2 id="org1d14acd">Some misunderstandings about C++20 coroutines</h2>
-<div class="outline-text-2" id="text-org1d14acd">
+<div id="outline-container-org3211089" class="outline-2">
+<h2 id="org3211089">Some misunderstandings about C++20 coroutines</h2>
+<div class="outline-text-2" id="text-org3211089">
 <p>
 There are some common misunderstandings about what C++20 coroutines
 are. It is important to deal with these right away. Otherwise the
@@ -148,38 +148,147 @@ is already acquainted with.
 <ul class="org-ul">
 <li><b>"Hey! These coroutines are nothing like those in Lua, Go, nor
 Javascript!"</b>: That is right. C++20 coroutines follow their own
-approach, with some similar aspects to other languages' coroutines,
-but many differences<sup><a id="fnr.2" class="footref" href="#fn.2" role="doc-backlink">2</a></sup>.</li>
-<li><b>"Are <code>std::promise</code> and coroutine's <code>promise_type</code> related?"</b>: No, this
+approach. Some aspects may be familiar to you from other languages,
+but in general you should expect many differences with C++20
+coroutines<sup><a id="fnr.2" class="footref" href="#fn.2" role="doc-backlink">2</a></sup>.</li>
+<li><b>"Are <code>std::promise</code> and a coroutine's <code>promise_type</code> related?"</b>: No, this
 is yet another C++ misnomer.</li>
-<li><b>"When do threads come into play?"</b>: Think about callbacks, do
-callbacks have any concurrency/threading by themselves? No! However
-<i>task queues</i> of callbacks can be constructed. These task queues may
-be concurrently accessed by many threads. Something analogous
-happens with coroutines: their nature does not involve concurrency,
-but they compose rather nicely with concurrent solutions. This post
-deals with the guts of C++20 coroutines, so we will be ignoring the
-concurrent aspect throughout the rest of the post.</li>
+<li><b>"When do threads come into play?"</b>: Do callbacks involve any
+concurrency/threading by themselves? No! However <i>task queues</i> of
+callbacks can be constructed. These task queues may be concurrently
+accessed by many threads. Something analogous happens with
+coroutines: their nature does not involve concurrency, but they
+compose rather nicely with concurrent solutions. This post deals
+with the guts of C++20 coroutines, so we will be ignoring the
+concurrent aspect throughout most of this post.</li>
 </ul>
 </div>
 
-<div id="outline-container-orgcf4fb10" class="outline-3">
-<h3 id="orgcf4fb10"><span class="todo TODO">TODO</span> From coroutines to callbacks and the other way around</h3>
+<div id="outline-container-orgb102e94" class="outline-3">
+<h3 id="orgb102e94"><span class="todo TODO">TODO</span> From coroutines to callbacks and the other way around</h3>
+<div class="outline-text-3" id="text-orgb102e94">
+<p>
+It will be useful to roughly delineate how to convert code using C++20
+coroutines to <i>continuation passing style</i> (CPS, fancy terminology for
+callbacks) and the other way around. CPS is consistent between
+different programming languages and better understood by the general
+public. The essentiality of some parts of the C++20 coroutines API is
+sometimes easier to see when we inspect the "equivalent" CPS code.
+</p>
+
+
+<p>
+Let us begin with the simple case of a coroutine without exceptions,
+<code>co_await</code> calls in a loop, nor recursion in its body.
+</p>
+
+
+<p>
+Our initial translation to CPS is quite straight forward:
+</p>
+
+
+<ol class="org-ol">
+<li>For each expression being awaited, write a function that takes a
+callback as parameter.</li>
+<li>If the result of <code>co_await</code> expression is assigned to some local
+variable, turn this local variable into the sole parameter of a new
+function. Otherwise, create a function that does not take any
+parameter.  This function is used as the callback parameter of the
+function written in step 1.</li>
+<li>Everything in the coroutine body after the statement containing the
+<code>co_await</code> expression is the body of the function created in step 2.</li>
+</ol>
+
+
+<p>
+Under this procedure, the preceding code translates into CPS as
+follows:
+</p>
+
+
+<p>
+Before considering the case of <code>co_await</code> calls in a loop or recursion
+in the body of a coroutine, let us deal with exceptions.
+</p>
+
+
+<p>
+Whenever a <code>co_await</code> expression may throw, steps above are
+modified as follows.
+</p>
+
+
+<ol class="org-ol">
+<li>For each expression being awaited
+<ul class="org-ul">
+<li>If the <code>co_await</code> expression does not throw, then write a function
+that takes one callback as parameter.</li>
+<li>Otherwise, write a function that takes two callbacks as
+parameters. The first one for the successful case, the second one
+for the error case.</li>
+</ul></li>
+
+<li><p>
+If the result of a <code>co_await</code> expression is assigned to some local
+variable, turn this local variable into the sole parameter of a new
+function. Otherwise, create a function that does not take any
+parameter. This function is used as the (successful case) callback
+parameter of the function written in step 1.
+</p>
+
+<p>
+In addition, if the <code>co_await</code> expression may throw, then create
+another function that takes as sole parameter an instance of a type
+representing the exception captured in the <code>catch</code> block. This latter
+function is used as the error case callback parameter of the
+function written in step 1.
+</p></li>
+
+<li>Everything (within the <code>try</code> block and after the <code>try / catch</code>
+construct until the end of the coroutine body) of a (throwing)
+<code>co_await</code> expression is the body of the function (for the successful
+case) created in step 2. If the <code>co_await</code> expression throws,
+everything withing the <code>catch</code> block and after the <code>try / catch</code>
+construct untis the end of the coroutine body is the body of the
+function for the error case created in step 2.</li>
+</ol>
+
+
+<p>
+Under this procedure, the preceding code translates into CPS as
+follows:
+</p>
+
+
+<p>
+Finally, let us consider iteration and recursion with
+<code>co_await</code>. Consider the listing below.
+</p>
+
+
+<p>
+The core idea to translate this code to CPS is the same: put
+everything after <code>co_await</code> in a callback. But this time the number of
+callbacks needed (one per <code>co_await</code> execution) is not in correspondence
+with the number of <code>co_await</code> expressions written in the code.
+</p>
+</div>
 </div>
 </div>
 
-<div id="outline-container-org1d38eb7" class="outline-2">
-<h2 id="org1d38eb7"><span class="todo TODO">TODO</span> Empathising with c++20 coroutines</h2>
-<div class="outline-text-2" id="text-org1d38eb7">
+<div id="outline-container-org997ea7d" class="outline-2">
+<h2 id="org997ea7d"><span class="todo TODO">TODO</span> Empathising with c++20 coroutines</h2>
+<div class="outline-text-2" id="text-org997ea7d">
 <p>
 loootttss of subsections
 </p>
 </div>
 </div>
 
-<div id="outline-container-org8f6a54d" class="outline-2">
-<h2 id="org8f6a54d"><span class="todo TODO">TODO</span> Conclusions</h2>
-<div class="outline-text-2" id="text-org8f6a54d">
+<div id="outline-container-orge40e8c0" class="outline-2">
+<h2 id="orge40e8c0"><span class="todo TODO">TODO</span> Conclusions</h2>
+<div class="outline-text-2" id="text-orge40e8c0">
 </div>
 </div>
 <div id="footnotes">
