@@ -1,0 +1,22 @@
+#+options: ^:nil
+#+title: CPS and Senders & Receivers
+
+* WARNING!!!
+
+
+Work in progress
+
+* What is this about?
+
+
+When studying [[https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2300r10.html][P2300R10]] (Senders & Receivers proposal for C++26) the
+similarities between the proposal and Continuation Passing Style (CPS)
+seemed apparent from the beginning.  Attempting to write down a
+mapping between CPS terminology to S&R concepts was, however, harder
+than I thought. Some talks and posts out there seem to notice this
+too, but I have not found any resource introducing a crystal clear
+mapping of what senders, receivers, operation states, schedulers,
+etc. would be in the context of CPS. This post is my attempt to
+produce such a mapping.
+
+* Continuation Passing Style
