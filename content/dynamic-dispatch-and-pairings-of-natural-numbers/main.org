@@ -1,15 +1,13 @@
 #+options: ^:nil
 #+title: Dynamic multi-dispatch and pairings of natural numbers
 
-Recently at work I had the need to write a state machine in C++20.
-
-
-I guess the target audience already knows this, but for the sake of
-completeness let us recall that a state machine evolves over time by
-changing its internal state each time it is fed some input. Having to
-execute some logic based on both the current state and the input being
-fed implies implementations must use some kind of multi-dispatch
-technique (or nesting of conditionals of some sort).
+Recently at work I had to write a state machine in C++20. I guess the
+target audience already knows this, but for the sake of completeness
+let us recall that a state machine evolves over time by changing its
+internal state each time it is fed some input. Having to execute some
+logic based on /both/ the current state and the input being fed
+implies implementations must use some kind of /dynamic multi-dispatch/
+technique.
 
 
 In C++ there are well-known approaches to do this using =std::variant=
@@ -46,7 +44,8 @@ The =enum= types for this state machine are defined as follows
 
 #+include: ./code/basic.cpp src c++ :lines "153-155"
 
-A naive solution may attempt to do nested conditionals such as
+A naive solution can make use of nested conditionals to choose a
+behavior based on the value of state and input:
 
 #+BEGIN_SRC
   switch (state) {
@@ -84,23 +83,44 @@ A naive solution may attempt to do nested conditionals such as
 
 But this has a couple of issues:
 
-1. Maintainability: These =enum= have few values in their range.  My
-   practical case wouldn't fit as nicely in the page nor be as easy to
-   follow.  Regardless, my initial solution was this dumb, and I found
-   it was not only hard to read, but also it made some other
-   trade-offs which ended up introducing some technical debt (maybe
-   just a skill-issue of mine).
+1. **Maintainability**: These =enum= have few values in their range.
+   My practical case would not fit as nicely in the page nor the code
+   would be as easy to follow.  Regardless, my initial solution was
+   this simple, and I found it was not only hard to read, but also it
+   made some other trade-offs which ended up introducing some
+   technical debt (maybe just a skill-issue of mine).
 
-2. Double jumps: Here we do not have one sole jump, but rather two!
-   First there is a jump based on =state=, then there is a jump based
-   on =input=. The extra branching by itself may not be that much of
-   an issue on some modern CPUs as long as the transition patterns are
-   [[https://lemire.me/blog/2026/03/18/how-many-branches-can-your-cpu-predict/][predictible]]. However, the double jump may be problematic to the
-   instruction cache (the intermediate =case= blocks may be too far
-   apart, e.g. due to =-malign-labels=), or require some extra work
-   from the instruction fetch unit (e.g. Skylake fetches 16 bytes per
-   cycle).
+2. **Double jumps**: Here we do not have one sole jump, but rather
+   two!  First there is a jump based on =state=, then there is a jump
+   based on =input=. My hypothesis is that this is potentially
+   problematic for the CPU and the compiler:
+
+   - For the CPU: The extra branching by itself may not be that much
+     of an issue on some modern CPUs as long as the transition
+     patterns are [[https://lemire.me/blog/2026/03/18/how-many-branches-can-your-cpu-predict/][predictible]]. However, the double jump may be
+     problematic to the instruction cache (the intermediate =case=
+     blocks may be too far apart, e.g. due to =-malign-labels=), or
+     require some extra work from the instruction fetch unit
+     (e.g. Skylake fetches 16 bytes per cycle).
+
+   - /"Huh, but the compiler will surely optimize away the nesting"/:
+     As it turns out, compilers are not that good at optimizing nested
+     switches --- check this simple example on [[https://godbolt.org/z/7zb8YbesW][Compiler Explorer and
+     GCC 11.2]].  What switches compile to depends on [[https://youtu.be/gMqSinyL8uk][a lot of stuff]], in
+     particular the distribution of the values of the cases seems to
+     be very relevant: having a dense distribution of values when
+     there is a large number of cases encourages the compiler to
+     generate /jump tables/ (otherwise it resorts to other trickery,
+     such as binary searches). I am not a /connoisseur of switch
+     lowering/, nor pretending to be, I just stick with "compiler not
+     good at nested. Dense cases imply jump table imply success".
 
 So now we will try to come up with something nicer, which requires a
 single jump and provides some improvement in maintainability by
-generating the jump table automatically at compile time.
+generating the jump table automatically at compile time (although some
+would argue the resulting template metaprogramming becomes the new
+maintainability burden, valid point).
+
+* The math
+
+We want to conti
