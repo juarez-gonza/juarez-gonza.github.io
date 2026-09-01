@@ -1,5 +1,5 @@
 #+options: ^:nil
-#+title: Dynamic multi-dispatch pairings of natural numbers
+#+title: Dynamic multi-dispatch and pairings of natural numbers
 
 Recently at work I had the need to write a state machine in C++20.
 
