@@ -23,7 +23,8 @@ Using some mathematical and metaprogramming tricks the problem can be
 solved --- maybe not something I'd recommend if compilation times are
 of any concern at all, but I found this cool anyways.
 
-* The setup
+
+* The problem setup
 
 To begin, this is the finite state machine (FSM) transition table
 
@@ -123,4 +124,42 @@ maintainability burden, valid point).
 
 * The math
 
-We want to conti
+Summarizing, we need to convert the double jump caused by a nested
+=switch= into a single jump. Each =case= label is associated to *one*
+=integral= value. A double jump therefore requires *two* =integral=
+values to dispatch. Therefore we need to
+
+1. *convert* /two =integral= values into one =integral= value/, and
+
+2. this must be done *at compile time* (since the value must be
+   associated to a =case= label), and
+
+3. we need to *convert back* /one =integral= value into two =integral=
+   values/, and
+
+4. this must also be done *at compile time* because we want to use the
+   chosen integral values to perform /static/ dispatch (say, as
+   =std::integral_constant= tags).
+
+For this section we leave the compile time requirements aside and deal
+with the converting to and back from one =integral= to two =integral=
+values.
+
+
+At this point whoever did some amount of math is already thinking
+about a bijection between the natural numbers and the (binary)
+Cartesian product of the natural numbers with themselves, also called
+a [[https://en.wikipedia.org/wiki/Pairing_function][pairing function]]. And indeed that is where we are going but (1) we
+cannot use any pairing if we want good code generation from the
+compiler, and (2) I still want to give a rough overview for the
+uninitiated in the matter of pairings.
+
+** Some background on pairings
+
+** Choosing a pairing
+
+* The solution
+
+* Beyond the solution: going variadic
+
+* Conclusion
