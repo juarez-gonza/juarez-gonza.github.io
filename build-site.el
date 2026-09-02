@@ -26,6 +26,7 @@
 ;; Define the publishing project
 (setq org-publish-project-alist
       (list
+       ;; Blog posts
        (list "org-site:main"
              :recursive t
              :base-directory "./content"
@@ -34,8 +35,16 @@
              :with-author nil ;; Don't include author name
              :with-creator t ;; Include Emacs and Org versions in footer
              :with-toc t     ;; Include a table of contents
-             :section-numbers nil    ;; Don't include section numbers
-             :time-stamp-file nil)))    ;; Don't include time stamp in file
+             :section-numbers nil   ;; Don't include section numbers
+             :time-stamp-file nil) ;; Don't include time stamp in file
+
+       ;; Images and other static files
+       (list "org-site:static"
+             :recursive t
+             :base-directory "./content"
+             :publishing-function 'org-publish-attachment
+             :publishing-directory "./public"
+             :base-extension "png\\|jpg\\|jpeg\\|gif\\|svg\\|webp")))
 
 ;; Generate the site output
 (org-publish-all t)
