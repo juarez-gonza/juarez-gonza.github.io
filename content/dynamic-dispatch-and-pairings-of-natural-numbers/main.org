@@ -106,7 +106,7 @@ But this has a couple of issues:
      make inefficient use of the instruction fetch unit (e.g. Skylake
      fetches 16 bytes per cycle).
 
-   - /"Huh, but the compiler will surely optimize away the nesting"/:
+   - <<switch-lowering>> /"Huh, but the compiler will surely optimize away the nesting"/:
      It turns out compilers are not that good at optimizing nested
      switches --- check this simple example on [[https://godbolt.org/z/7zb8YbesW][Compiler Explorer and
      GCC 11.2]].  What switches compile to depends on [[https://youtu.be/gMqSinyL8uk][a lot of stuff]], in
@@ -155,10 +155,9 @@ between the set of natural numbers ($\mathbb{N}$) and the set of pairs
 of natural numbers ($\mathbb{N} \times \mathbb{N}$).  Pairing
 functions are used, for example, to demonstrate that $\mathbb{N}$ and
 $\mathbb{N} \times \mathbb{N}$ have the same "size" --- an unintuitive
-result at first because that is definitely not the case if instead of
-natural numbers we were talking about some set with a finite amount of
-elements. But things become odd when sets are infinite, and that is
-perfectly natural (pun intended).
+result at first because a finite set does not have a pairing function
+with its corresponding set of pairs. But things become odd when sets
+are infinite, and that is perfectly natural (pun intended).
 
 
 There are many pairing functions, I considered the following:
@@ -166,43 +165,64 @@ There are many pairing functions, I considered the following:
 - Pairing based on the [[https://en.wikipedia.org/wiki/Fundamental_theorem_of_arithmetic][Fundamental Theorem of Arithmetic]]. This pairing
   function uses the fact that any integer greater than $1$ has a
   unique representation as a product of powers of primes.  Such a
-  pairing $f$ and its inverse $f^{-1} can be defined as
+  pairing $f$ can be defined as
 
   \[
      f : \mathbb{N} \times \mathbb{N} \to \mathbb{N},\quad f(a,b) := 2^a 3^b
   \]
-  \[
-     f^{-1} : \mathbb{N} \to \mathbb{N} \times \mathbb{N},\quad f^{-1}(c) := (l(c, 2), l(c, 3))
-  \]
-
-  where $l$ is an integer form of logarithm
-
-  \begin{equation}
-   l(x, y) :=
-  \begin{cases}
-  \text{the greatest } z \leq x \text{ such that } y^z \text{ divides } x & \text{if } x, y \gt 1,\\
-  0 & \text{otherwise}.
-  \end{cases}
-  \end{equation}
 
   After staring at the definition of $f$ for a while, it is clear that
-  we cannot use this pairing. The set of values we work with in the
-  computer is not $\mathbb{N}$ but =std::uint64_t= at best. Trouble
-  would arise when the sum of the =enum= values $a$ and $b$ being
-  mapped is equal to or greater than $64$, because
+  we cannot use this pairing for at least two reasons:
 
-  \[
-  f(a,b) \geq 2^a3^b \geq 2^{a+b} \gt 2^{64}-1
-  \]
+  - First, the range of $f$ is too sparse. Two numbers in the range of
+    $f$ have a gap between them of at least a factor of $2$ between
+    them.  This is likely to have a [[switch-lowering][negative effect on the code
+    generated]] for the =switch= whose labels correspond to a subset of
+    the range of $f$.
 
-  overflows =std::uint64_t=!
+  - The second problem has to do with the finite nature of computers.
+    In computers we do not work with $\mathbb{N}$, but with
+    =std::uint64_t= at best (leaving =BigInt= out of the question, we
+    are doing #performance). Trouble would arise when the sum of the
+    =enum= values $a$ and $b$ being mapped is equal to or greater than
+    $64$, because
 
-- Cantor pairing function (the original one), which can be easily
-  visualized in the following grid
+      \[ f(a,b) \geq 2^a3^b \geq 2^{a+b} \gt 2^{64}-1 \]
 
-  The cantor pairing
+    overflows =std::uint64_t=!
 
-** Choosing a pairing
+  (For those interested in the inverse $f^{-1}$, I recommend the
+  introductory chapters on recursive functions in [[https://www.cambridge.org/core/books/computability-and-logic/440B4178B7CBF1C241694233716AB271][Computability and
+  Logic by Boolos, Burgess, & Jeffrey 5th ed]])
+
+- The [[https://en.wikipedia.org/wiki/Pairing_function#Cantor_pairing_function][Cantor pairing function]] is historically the first pairing
+  function (as far as I know). It can be easily visualized in the a 2D
+  graph as a walk through the diagonals of the graph.
+
+  TODO: GRAPH
+
+  Sort of by inspection you can tell the Cantor pairing function, $c :
+  \mathbb{N} \times \mathbb{N} \to \mathbb{N}$, is not as overflow
+  prone as the one based on the Fundamental Theorem of Arithmetic (the
+  gap does not increase by powers of $2$). However --- as shown in
+  [[https://www.vertexfragment.com/ramblings/cantor-szudzik-pairing-functions/][this blog that does a much better job than I can at explaining the
+  sparsity of the function]] --- even for the set $S := \{(x, y) \in
+  \mathbb{N} \times \mathbb{N} : x, y \lt 10 \}$ we get lots of gaps
+  in the subrange $\{ c(x, y) : (x, y) \in S \}$.  We can do much
+  better.
+
+- The [[http://szudzik.com/ElegantPairing.pdf][Szudzik pairing function]] is much more recent. Just as the Cantor
+  function, it can be easily visualized as a walk through a graph, but
+  this time the walk is performed across increasingly larger squares.
+
+  TODO: GRAPH
+
+  The approach of Szudzik achieves a very dense range (as shown in the
+  aforementioned [[https://www.vertexfragment.com/ramblings/cantor-szudzik-pairing-functions/][blog]] entry), which is perfect for our needs.
+
+There are many more pairing functions, but the Szudzik pairing is good
+enough (after writing this post I found this great [[https://drhagen.com/blog/superior-pairing-function/][summary on pairing
+functions]]).
 
 * The solution
 
