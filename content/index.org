@@ -14,4 +14,4 @@ I am a programmer (mostly C++) and I like math.
 
 This should be populated some day...
 
-[[file:./dynamic-dispatch-and-pairings-of-natural-numbers/main.org][Dynamic multi-dispatch and pairings of natural numbers]]
+[[file:dynamic-dispatch-and-pairings-of-natural-numbers/main.org][State machines, dynamic multi-dispatch, and pairings of natural numbers]]

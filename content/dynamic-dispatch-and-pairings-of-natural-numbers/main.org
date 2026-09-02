@@ -1,9 +1,9 @@
 #+options: ^:nil
-#+title: Dynamic multi-dispatch and pairings of natural numbers
+#+title: State machines, dynamic multi-dispatch, and pairings of natural numbers
 
-Recently at work I had to write a state machine in C++20. I guess the
-target audience already knows this, but for the sake of completeness
-let us recall that a state machine evolves over time by changing its
+Recently at work I had to write a state machine in C++20. At the
+expense of being redundant given the target audience of this post, let
+us recall that a state machine evolves over time by changing its
 internal state each time it is fed some input. Having to execute some
 logic based on /both/ the current state and the input being fed
 implies implementations must use some kind of /dynamic multi-dispatch/
@@ -12,21 +12,23 @@ technique.
 
 In C++ there are well-known approaches to do this using =std::variant=
 and =std::visit= (see [[https://khuttun.github.io/2017/02/04/implementing-state-machines-with-std-variant.html][Kalle Huttunen's post]], [[https://github.com/mpusz/fsm-variant][Mateusz Pusz's library]],
-or similar).  I guess it is possible to implement with
-inheritance-based dynamic polymorphism using something like the
-visitor pattern.  The problem is that due to circumstances of life and
-past decisions the dispatch was not based on types but based on =enum=
-values.
+or similar).  It is also possible to implement with inheritance-based
+dynamic polymorphism using something like the visitor pattern.  The
+problem is that due to circumstances of life and past decisions (of my
+authoring) the dispatch mechanism must not be based on types, but
+based on =enum= values.
 
 
 Using some mathematical and metaprogramming tricks the problem can be
-solved --- maybe not something I'd recommend if compilation times are
-of any concern at all, but I found this cool anyways.
+solved and even extended to work for the n-ary case --- maybe not
+something I'd recommend if compilation times are of any concern at
+all, but I found this cool anyways.
 
 
 * The problem setup
 
-To begin, this is the finite state machine (FSM) transition table
+In order to have something concrete in mind, we will use the finite
+state machine (FSM) described by the following transition table
 
 | State\Event   | a | b | c |
 |---------------+---+---+---|
@@ -101,11 +103,11 @@ But this has a couple of issues:
      patterns are [[https://lemire.me/blog/2026/03/18/how-many-branches-can-your-cpu-predict/][predictible]]. However, the double jump may be
      problematic to the instruction cache (the intermediate =case=
      blocks may be too far apart, e.g. due to =-malign-labels=), or
-     require some extra work from the instruction fetch unit
-     (e.g. Skylake fetches 16 bytes per cycle).
+     make inefficient use of the instruction fetch unit (e.g. Skylake
+     fetches 16 bytes per cycle).
 
    - /"Huh, but the compiler will surely optimize away the nesting"/:
-     As it turns out, compilers are not that good at optimizing nested
+     It turns out compilers are not that good at optimizing nested
      switches --- check this simple example on [[https://godbolt.org/z/7zb8YbesW][Compiler Explorer and
      GCC 11.2]].  What switches compile to depends on [[https://youtu.be/gMqSinyL8uk][a lot of stuff]], in
      particular the distribution of the values of the cases seems to
@@ -118,9 +120,9 @@ But this has a couple of issues:
 
 So now we will try to come up with something nicer, which requires a
 single jump and provides some improvement in maintainability by
-generating the jump table automatically at compile time (although some
-would argue the resulting template metaprogramming becomes the new
-maintainability burden, valid point).
+generating the jump table automatically at compile time --- although
+some would argue the resulting template metaprogramming becomes the
+new maintainability burden, a valid point.
 
 * The math
 
@@ -143,18 +145,62 @@ values to dispatch. Therefore we need to
 
 For this section we leave the compile time requirements aside and deal
 with the converting to and back from one =integral= to two =integral=
-values.
+values.  Moreover, we will restrict the problem to /unsigned/
+=integral= values. This screams [[https://en.wikipedia.org/wiki/Pairing_function][pairing function]]!
 
 
-At this point whoever did some amount of math is already thinking
-about a bijection between the natural numbers and the (binary)
-Cartesian product of the natural numbers with themselves, also called
-a [[https://en.wikipedia.org/wiki/Pairing_function][pairing function]]. And indeed that is where we are going but (1) we
-cannot use any pairing if we want good code generation from the
-compiler, and (2) I still want to give a rough overview for the
-uninitiated in the matter of pairings.
+As a one-paragraph-context for those not familiarized with the
+concept: a pairing function is an invertible function (a bijection)
+between the set of natural numbers ($\mathbb{N}$) and the set of pairs
+of natural numbers ($\mathbb{N} \times \mathbb{N}$).  Pairing
+functions are used, for example, to demonstrate that $\mathbb{N}$ and
+$\mathbb{N} \times \mathbb{N}$ have the same "size" --- an unintuitive
+result at first because that is definitely not the case if instead of
+natural numbers we were talking about some set with a finite amount of
+elements. But things become odd when sets are infinite, and that is
+perfectly natural (pun intended).
 
-** Some background on pairings
+
+There are many pairing functions, I considered the following:
+
+- Pairing based on the [[https://en.wikipedia.org/wiki/Fundamental_theorem_of_arithmetic][Fundamental Theorem of Arithmetic]]. This pairing
+  function uses the fact that any integer greater than $1$ has a
+  unique representation as a product of powers of primes.  Such a
+  pairing $f$ and its inverse $f^{-1} can be defined as
+
+  \[
+     f : \mathbb{N} \times \mathbb{N} \to \mathbb{N},\quad f(a,b) := 2^a 3^b
+  \]
+  \[
+     f^{-1} : \mathbb{N} \to \mathbb{N} \times \mathbb{N},\quad f^{-1}(c) := (l(c, 2), l(c, 3))
+  \]
+
+  where $l$ is an integer form of logarithm
+
+  \begin{equation}
+   l(x, y) :=
+  \begin{cases}
+  \text{the greatest } z \leq x \text{ such that } y^z \text{ divides } x & \text{if } x, y \gt 1,\\
+  0 & \text{otherwise}.
+  \end{cases}
+  \end{equation}
+
+  After staring at the definition of $f$ for a while, it is clear that
+  we cannot use this pairing. The set of values we work with in the
+  computer is not $\mathbb{N}$ but =std::uint64_t= at best. Trouble
+  would arise when the sum of the =enum= values $a$ and $b$ being
+  mapped is equal to or greater than $64$, because
+
+  \[
+  f(a,b) \geq 2^a3^b \geq 2^{a+b} \gt 2^{64}-1
+  \]
+
+  overflows =std::uint64_t=!
+
+- Cantor pairing function (the original one), which can be easily
+  visualized in the following grid
+
+  The cantor pairing
 
 ** Choosing a pairing
 
