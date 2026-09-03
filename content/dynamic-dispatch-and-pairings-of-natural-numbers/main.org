@@ -205,8 +205,9 @@ Note. =unsigned_arithmetic_result_t= is similar to
 integral type that can accommodate for the result of operations
 between =T= / =S=, =T= / =T=, and =S= / =S=.  Enabling
 =-Wsign-conversion= makes the return statement explode due to the
-[[https://en.cppreference.com/cpp/language/usual_arithmetic_conversions][usual arithmetic conversions]], but I haven't found a way to get rid of
-those errors with which I'm happy with.
+[[https://en.cppreference.com/cpp/language/usual_arithmetic_conversions][usual arithmetic conversions]], but I'm too lazy to do the (extensive)
+proof by cases that I think could lead to a solution for any =T= and
+=S=.
 
 The inverse of the Szudzik pairing is given by
 
@@ -218,7 +219,7 @@ The inverse of the Szudzik pairing is given by
   \end{cases}.
 \end{equation*}  
 
-which is implemented with the following snippet
+which is implemented by the following snippet
 
 #+include: ./code/basic.cpp src c++ :lines "49-77"
 
@@ -228,6 +229,52 @@ nothing too crazy. Now we only need some metaprogramming to glue
 things together.
 
 * The solution
+
+So, lets start off by specifying the signature of the function that
+will perform the whole dynamic dispatch
+
+#+include: ./code/basic.cpp src c++ :lines "113-116"
+
+where =F= is the type of an function invocable with
+=std::integral_constant= types that lift the values of =enum=, and the
+return type is whatever that invocable returns.
+
+Then an implementation of the FSM shown at the beginning of the
+previous section from the user side would look as below
+
+#+include: ./code/basic.cpp src c++ :lines "210-274"
+
+Perhaps it is not the prettiest, but it has the basic machinery to get
+going. Aliases and what not can be used to prettify in the aftermath.
+
+** The strategy
+
+1. (compile time) For each =enum= (i.e., =StateT=, =InputT=), list its
+   values.
+
+2. (compile time) For each =enum=, map its values to per =enum= unique
+   =unsigned integral= values. This map must be a bijective function
+   $g$ --- we will need to undo this mapping later with $g^{-1}$.
+
+3. (compile time) Obtain the cartesian product of the lists of
+   =unsigned integral= values.
+
+4. (compile time) Map each element in the cartesian product to a
+   single =unsigned integral= using =szudzek_pair=.
+
+5. (compile time) Use the resulting list of =unsigned integral= to
+   construct a flat =switch=.
+
+6. (compile-time) Since the associated value to a =case= is constant,
+   use =szudzek_unpair= and $g^{-1}$ to obtain compile time values
+   $(x, y)$ for each possible =case= label and invoke the argument
+   function =f= using =integral_constant= tags constructed from $x$
+   and $y$.
+
+7. (runtime) For the input =state= and =input= obtain its encoding $s$
+   using =szudzek_pair=.
+
+8. (runtime) Dispatch over the flat =switch= with $s$ as argument.
 
 * Beyond the solution: going variadic
 
