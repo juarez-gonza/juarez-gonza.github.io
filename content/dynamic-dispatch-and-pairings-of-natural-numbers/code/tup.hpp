@@ -1,15 +1,17 @@
+#include <boost/mp11.hpp>
+
 #include <utility>
 
 template <std::size_t MaxCount, typename Is, typename... Ts>
 struct tup_impl;
 
 template <>
-struct tup_impl<0, std::index_sequence<>> {
+struct tup_impl<0, std::index_sequence<>, boost::mp11::mp_list<>> {
     static constexpr std::size_t size = 0;
 };
 
 template <std::size_t MaxCount, std::size_t I, typename T>
-struct tup_impl<MaxCount, std::index_sequence<I>, T> {
+struct tup_impl<MaxCount, std::index_sequence<I>, boost::mp11::mp_list<T>> {
     static constexpr std::size_t size = MaxCount;
     T x;
     constexpr T get(
@@ -20,19 +22,20 @@ struct tup_impl<MaxCount, std::index_sequence<I>, T> {
 
 template <std::size_t MaxCount, std::size_t I, std::size_t... Is, typename T,
           typename... Ts>
-struct tup_impl<MaxCount, std::index_sequence<I, Is...>, T, Ts...>
-    : tup_impl<MaxCount, std::index_sequence<Is...>, Ts...> {
+struct tup_impl<MaxCount, std::index_sequence<I, Is...>, boost::mp11::mp_list<T, Ts...>>
+    : tup_impl<MaxCount, std::index_sequence<Is...>, boost::mp11::mp_list<Ts...>> {
     T x;
-    using tup_impl<MaxCount, std::index_sequence<Is...>, Ts...>::get;
+    using tup_impl<MaxCount, std::index_sequence<Is...>, boost::mp11::mp_list<Ts...>>::get;
     constexpr T get(
         std::integral_constant<std::size_t, MaxCount - I - 1>) const {
         return x;
     }
 };
 
+// NOTE: mp11 to reverse the list so that the aggregate initialization order corresponds to the tomplate parameter order
 template <typename... Ts>
 struct tup
-    : tup_impl<sizeof...(Ts), std::make_index_sequence<sizeof...(Ts)>, Ts...> {
+    : tup_impl<sizeof...(Ts), std::make_index_sequence<sizeof...(Ts)>, boost::mp11::mp_reverse<boost::mp11::mp_list<Ts...>>> {
 };
 
 template <typename... Ts>
@@ -89,3 +92,6 @@ static_assert(p<0>(tup{1} + tup{2} + tup{3}) == 1);
 static_assert(p<1>(tup{1} + tup{2} + tup{3}) == 2);
 static_assert(p<2>(tup{1} + tup{2} + tup{3}) == 3);
 static_assert((tup{1} + tup{2} + tup{3}).size == 3);
+
+static_assert(p<1>(tup<int, double>{1, 2.0}) == 2.0);
+static_assert(std::same_as<tup<int, double>, decltype(tup{1, 2.0})>);

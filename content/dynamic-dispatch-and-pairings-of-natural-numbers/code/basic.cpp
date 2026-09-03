@@ -9,28 +9,64 @@
 ////////// SZUDZIK PAIRING //////////
 /////////////////////////////////////
 
+template <typename... Ts>
+struct unsigned_arithmetic_result;
+
+template <typename T>
+struct unsigned_arithmetic_result<T> {
+    using type =
+        std::make_unsigned_t<decltype(std::declval<T>() + std::declval<T>())>;
+};
+
+template <typename T1, typename T2>
+struct unsigned_arithmetic_result<T1, T2> {
+    using type = std::make_unsigned_t<
+        decltype((std::declval<T1>() + std::declval<T1>()) +
+                 (std::declval<T2>() + std::declval<T2>()))>;
+};
+
+template <typename T1, typename T2, typename... Ts>
+struct unsigned_arithmetic_result<T1, T2, Ts...>
+    : unsigned_arithmetic_result<
+          typename unsigned_arithmetic_result<T1, T2>::type, Ts...> {};
+
+template <typename... Ts>
+using unsigned_arithmetic_result_t =
+    typename unsigned_arithmetic_result<Ts...>::type;
+
 // Szudzik's Elegant Pairing Function
 // http://szudzik.com/ElegantPairing.pdf
-template <std::integral T, std::integral S>
-constexpr std::common_type_t<T, S> szudzik_pair(T x, S y) {
-    return y > x ? (y * y + x) : (x * x + x + y);
+template <std::unsigned_integral T, std::unsigned_integral S>
+constexpr unsigned_arithmetic_result_t<T, S> szudzik_pair(T x, S y) {
+    return y > x ? x + y * y : x * x + x + y;
+}
+
+template <std::unsigned_integral T>
+constexpr T szudzik_pair(T x) {
+    return x;
 }
 
 // need for constexpr
-template <std::integral T>
+template <std::unsigned_integral T>
 constexpr T isqrt(T x) {
     T out{};
     for (; (out + 1) * (out + 1) <= x; out++);
     return out;
 }
 
-template <std::integral T, std::integral S, std::integral I>
+template <std::unsigned_integral T, std::unsigned_integral S,
+          std::same_as<unsigned_arithmetic_result_t<T, S>> I>
 constexpr std::pair<T, S> szudzik_unpair(I x) {
     // cannot use variables for common subexpressions due to constexpr
     // constraints:
     //
     // q = isqrt(x)
     // l = x - isqrt(x) * isqrt(x)
+
+    // Casts shouldn't cause a narrowing issue here, as we have
+    // already checked I == unsigned_arithmetic_result_t<T, S> and we
+    // know the values come from a szudzik_pair function so the
+    // decomposition lies in the correct range of values for T and S
     return (x - isqrt(x) * isqrt(x)) < isqrt(x)
                ? std::pair{static_cast<T>(x - isqrt(x) * isqrt(x)),
                            static_cast<S>(isqrt(x))}
@@ -77,36 +113,6 @@ using mp_enum_values_to_underlying =
 template <typename StateT, typename InputT, typename F>
     requires std::is_enum_v<StateT> and std::is_enum_v<InputT>
 constexpr auto dispatch_enum(F&& f, StateT state, InputT input) {
-    // 1. get the types associated to states and inputs (this requires
-    // an existing table that maps each entry in the enum to a type
-    // representation)
-    //
-    // 2. map each state to a different integer
-    //
-    // 3. map each input to a different integer
-    //
-    // 4. get the cartesian product of these integers
-    //
-    // 5. map each pair to a single integer using some pairing
-    // function (the number of cases depends on the distribution of
-    // the range of the pairing function
-    // https://en.wikipedia.org/wiki/Pairing_function . Szudik's
-    // pairing has a rather compact distribution)
-    //
-    // 6. map the (possibly runtime) values `state` and `input` to an
-    // integer using the pairing function (now possibly executing at
-    // runtime)
-    //
-    // 7. invoke mp_with_index on a function that converts the runtime
-    // value into a compile time constant (here is where the switch is
-    // hidden)
-    //
-    // 8. use the inverse of the pairing function on the integer
-    // number to get the pair of integers
-    //
-    // 9. call the argument function with the specific types as
-    // arguments
-
     using to_integral_values =
         boost::mp11::mp_compose<mp_enum_to_enum_values,
                                 mp_enum_values_to_underlying>;
@@ -118,20 +124,20 @@ constexpr auto dispatch_enum(F&& f, StateT state, InputT input) {
         boost::mp11::mp_product<mp_szudzik_pair, integral_states,
                                 integral_inputs>;
 
-    using max_encoding =
+    using max_code =
         boost::mp11::mp_max_element<encoded_pairs, boost::mp11::mp_less>;
 
-    auto encoded =
+    using encoded_type = max_code::value_type;
+
+    encoded_type encoded =
         szudzik_pair(static_cast<std::underlying_type_t<StateT>>(state),
                      static_cast<std::underlying_type_t<InputT>>(input));
 
-    // Here encoded may have been turned into an int due to common_type, but we
-    // know we are operating with unsigned numbers (problem restriction)
-    boost::mp11::mp_with_index<
-        max_encoding>(static_cast<std::size_t>(encoded), [&](auto i) {
+    boost::mp11::mp_with_index<max_code>(encoded, [&](auto i) {
         constexpr auto decoded_pair =
             szudzik_unpair<std::underlying_type_t<StateT>,
-                           std::underlying_type_t<InputT>>(decltype(i)::value);
+                           std::underlying_type_t<InputT>>(
+                static_cast<encoded_type>(decltype(i)::value));
         constexpr std::integral_constant<StateT, StateT{decoded_pair.first}>
             state{};
         constexpr std::integral_constant<InputT, InputT{decoded_pair.second}>
@@ -184,7 +190,7 @@ concept has_attached_enum_value_sequence =
  */
 
 enum class states : std::uint16_t { A, B, C, D };
-enum class inputs : std::uint8_t { a, b, c };
+enum class inputs : std::uint32_t { a, b, c };
 
 // example of alternative to magic_enum (specializations)
 
