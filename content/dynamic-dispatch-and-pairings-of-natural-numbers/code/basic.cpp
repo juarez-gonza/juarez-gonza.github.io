@@ -3,6 +3,11 @@
 #include <cmath>
 #include <concepts>
 #include <limits>
+#include <magic_enum.hpp>
+
+/////////////////////////////////////
+////////// SZUDZIK PAIRING //////////
+/////////////////////////////////////
 
 // Szudzik's Elegant Pairing Function
 // http://szudzik.com/ElegantPairing.pdf
@@ -12,66 +17,66 @@ constexpr std::common_type_t<T, S> szudzik_pair(T x, S y) {
 }
 
 // need for constexpr
-template <typename T>
+template <std::integral T>
 constexpr T isqrt(T x) {
     T out{};
     for (; (out + 1) * (out + 1) <= x; out++);
     return out;
 }
 
-template <std::integral T, std::integral S, typename I>
-constexpr std::pair<T, S> szudzik_unpair(I /* integral_constant */) {
-    constexpr auto x = I::value;
-    constexpr auto q = isqrt(x);
-    constexpr auto l = x - q * q;
-    return l < q ? std::pair{static_cast<T>(l), static_cast<S>(q)}
-                 : std::pair{static_cast<T>(q), static_cast<S>(l - q)};
+template <std::integral T, std::integral S, std::integral I>
+constexpr std::pair<T, S> szudzik_unpair(I x) {
+    // cannot use variables for common subexpressions due to constexpr
+    // constraints:
+    //
+    // q = isqrt(x)
+    // l = x - isqrt(x) * isqrt(x)
+    return (x - isqrt(x) * isqrt(x)) < isqrt(x)
+               ? std::pair{static_cast<T>(x - isqrt(x) * isqrt(x)),
+                           static_cast<S>(isqrt(x))}
+               : std::pair{
+                     static_cast<T>(isqrt(x)),
+                     static_cast<S>((x - isqrt(x) * isqrt(x)) - isqrt(x))};
 }
 
-struct q_szudzik_pair {
-    template <class T, class S> /* requires std::integral_constant<T> and
-                                   std::integral_contstant<S> */
-    using fn = std::integral_constant<
-        std::common_type_t<typename T::value_type, typename S::value_type>,
-        szudzik_pair(T::value, S::value)>;
-};
+template <typename T, typename S> /* requires is_integral_constant<T> and
+                                     is_integral_constant<S> */
+using mp_szudzik_pair =
+    std::integral_constant<decltype(szudzik_pair(T::value, S::value)),
+                           szudzik_pair(T::value, S::value)>;
 
-struct q_to_underlying {
-    template <class T> /* requires T == std::integral_constant<Enum, e> */
-    using fn = std::integral_constant<
-        std::underlying_type_t<typename T::value_type>,
-        static_cast<std::underlying_type_t<typename T::value_type>>(T::value)>;
-};
+//////////////////////////////////////////
+////////// ENUM VALUES TO TYPES //////////
+//////////////////////////////////////////
 
-template <typename E, E... values>
-    requires std::is_enum<E>::value
-struct enum_value_sequence {
-    using type = boost::mp11::mp_list<std::integral_constant<E, values>...>;
-};
+template <auto Array, std::size_t... I>
+constexpr auto lift_array_(std::index_sequence<I...>) -> boost::mp11::mp_list<
+    std::integral_constant<typename decltype(Array)::value_type, Array[I]>...>;
 
-template <typename>
-struct is_enum_value_sequence_ : std::false_type {};
+template <auto Array>
+using array_to_mp_list =
+    decltype(lift_array_<Array>(std::make_index_sequence<Array.size()>{}));
 
-template <typename E, E... values>
-struct is_enum_value_sequence_<enum_value_sequence<E, values...>>
-    : std::true_type {};
+template <typename Enum>
+using mp_enum_to_enum_values =
+    array_to_mp_list<magic_enum::enum_values<Enum>()>;
 
-template <typename T>
-concept is_enum_value_sequence = is_enum_value_sequence_<T>::value;
+template <typename T> /* requires is_integral_constant<T> */
+using mp_to_underlying = std::integral_constant<
+    std::underlying_type_t<typename T::value_type>,
+    static_cast<std::underlying_type_t<typename T::value_type>>(T::value)>;
 
-template <typename>
-struct attach_enum_value_sequence;
+template <typename EnumValues>
+using mp_enum_values_to_underlying =
+    boost::mp11::mp_transform<mp_to_underlying, EnumValues>;
 
-template <typename T>
-concept has_attached_enum_value_sequence =
-    std::is_enum<T>::value and requires() {
-        typename attach_enum_value_sequence<T>::type;
-        typename attach_enum_value_sequence<T>::underlying_type;
-    };
+/////////////////////////////////////////
+//////// DISPATCH ENUM FUNCTION /////////
+/////////////////////////////////////////
 
-template <has_attached_enum_value_sequence StateT,
-          has_attached_enum_value_sequence InputT, typename F>
-constexpr auto match(F&& f, StateT state, InputT input) {
+template <typename StateT, typename InputT, typename F>
+    requires std::is_enum_v<StateT> and std::is_enum_v<InputT>
+constexpr auto dispatch_enum(F&& f, StateT state, InputT input) {
     // 1. get the types associated to states and inputs (this requires
     // an existing table that maps each entry in the enum to a type
     // representation)
@@ -102,20 +107,16 @@ constexpr auto match(F&& f, StateT state, InputT input) {
     // 9. call the argument function with the specific types as
     // arguments
 
-    using state_enum_values = attach_enum_value_sequence<StateT>::type;
-    using input_enum_values = attach_enum_value_sequence<InputT>::type;
+    using to_integral_values =
+        boost::mp11::mp_compose<mp_enum_to_enum_values,
+                                mp_enum_values_to_underlying>;
 
-    using integral_states =
-        boost::mp11::mp_transform_q<q_to_underlying,
-                                    typename state_enum_values::type>;
-
-    using integral_inputs =
-        boost::mp11::mp_transform_q<q_to_underlying,
-                                    typename input_enum_values::type>;
+    using integral_states = to_integral_values::fn<StateT>;
+    using integral_inputs = to_integral_values::fn<InputT>;
 
     using encoded_pairs =
-        boost::mp11::mp_product_q<q_szudzik_pair, integral_states,
-                                  integral_inputs>;
+        boost::mp11::mp_product<mp_szudzik_pair, integral_states,
+                                integral_inputs>;
 
     using max_encoding =
         boost::mp11::mp_max_element<encoded_pairs, boost::mp11::mp_less>;
@@ -124,11 +125,13 @@ constexpr auto match(F&& f, StateT state, InputT input) {
         szudzik_pair(static_cast<std::underlying_type_t<StateT>>(state),
                      static_cast<std::underlying_type_t<InputT>>(input));
 
-    boost::mp11::mp_with_index<static_cast<std::size_t>(
-        max_encoding::value)>(static_cast<std::size_t>(encoded), [&](auto i) {
+    // Here encoded may have been turned into an int due to common_type, but we
+    // know we are operating with unsigned numbers (problem restriction)
+    boost::mp11::mp_with_index<
+        max_encoding>(static_cast<std::size_t>(encoded), [&](auto i) {
         constexpr auto decoded_pair =
             szudzik_unpair<std::underlying_type_t<StateT>,
-                           std::underlying_type_t<InputT>>(i);
+                           std::underlying_type_t<InputT>>(decltype(i)::value);
         constexpr std::integral_constant<StateT, StateT{decoded_pair.first}>
             state{};
         constexpr std::integral_constant<InputT, InputT{decoded_pair.second}>
@@ -136,6 +139,36 @@ constexpr auto match(F&& f, StateT state, InputT input) {
         std::forward<decltype(f)>(f)(state, input);
     });
 }
+
+// example of alternative to magic_enum (definitions)
+
+template <typename E, E... values>
+    requires std::is_enum<E>::value
+struct enum_value_sequence {
+    using type = boost::mp11::mp_list<std::integral_constant<E, values>...>;
+};
+
+template <typename>
+struct is_enum_value_sequence_ : std::false_type {};
+
+template <typename E, E... values>
+struct is_enum_value_sequence_<enum_value_sequence<E, values...>>
+    : std::true_type {};
+
+template <typename T>
+concept is_enum_value_sequence = is_enum_value_sequence_<T>::value;
+
+template <typename>
+struct attach_enum_value_sequence;
+
+template <typename T>
+concept has_attached_enum_value_sequence =
+    std::is_enum<T>::value and requires() {
+        typename attach_enum_value_sequence<T>::type;
+        typename attach_enum_value_sequence<T>::underlying_type;
+    };
+
+// start of state machine example
 
 #include <iostream>
 #include <stdexcept>
@@ -150,8 +183,10 @@ constexpr auto match(F&& f, StateT state, InputT input) {
    * | D | - | - | - |
  */
 
-enum class states { A, B, C, D };
-enum class inputs { a, b, c };
+enum class states : std::uint16_t { A, B, C, D };
+enum class inputs : std::uint8_t { a, b, c };
+
+// example of alternative to magic_enum (specializations)
 
 template <>
 struct attach_enum_value_sequence<states> {
@@ -227,7 +262,7 @@ struct fsm {
 
     [[nodiscard]] constexpr bool done() const { return s == states::D; }
 
-    constexpr void dispatch_input(inputs e) { match(*this, s, e); };
+    constexpr void dispatch_input(inputs e) { dispatch_enum(*this, s, e); };
     states s{states::A};
 };
 

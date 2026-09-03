@@ -45,7 +45,7 @@ finer semantic details of the FSM.
 
 The =enum= types for this state machine are defined as follows
 
-#+include: ./code/basic.cpp src c++ :lines "153-155"
+#+include: ./code/basic.cpp src c++ :lines "186-188"
 
 A naive solution can make use of nested conditionals to choose a
 behavior based on the value of state and input:
@@ -159,7 +159,6 @@ result at first because a finite set does not have a pairing function
 with its corresponding set of pairs. But things become odd when sets
 are infinite, and that is perfectly natural (pun intended).
 
-
 There are [[https://drhagen.com/blog/superior-pairing-function/][many pairing functions]], I considered the following:
 
 - Pairing based on the [[https://en.wikipedia.org/wiki/Fundamental_theorem_of_arithmetic][Fundamental Theorem of Arithmetic]]. This pairing
@@ -177,8 +176,8 @@ There are [[https://drhagen.com/blog/superior-pairing-function/][many pairing fu
   - First, the range of $f$ is too sparse. Two numbers in the range of
     $f$ have a gap between them of at least a factor of $2$ between
     them.  This is likely to have a [[switch-lowering][negative effect on the code
-    generated]] for the =switch= whose labels correspond to a subset of
-    the range of $f$.
+    generated]] for the =switch= whose =case= labels are associated to a
+    subset of the range of $f$.
 
   - The second problem has to do with the finite nature of computers.
     In computers we do not work with $\mathbb{N}$, but with
@@ -214,9 +213,9 @@ There are [[https://drhagen.com/blog/superior-pairing-function/][many pairing fu
   much better.
 
 - The [[http://szudzik.com/ElegantPairing.pdf][Szudzik pairing function]] is relatively recent, given that the
-  last two entries were from the 1800s and the beginning of 1900s. It
-  too can be visualized as a walk through a graph, but this time the
-  walk follows the sides of increasingly larger squares.
+  last two entries were from the 1800s and the beginning of the
+  1900s. It too can be visualized as a walk through a graph, but this
+  time the walk follows the sides of increasingly larger squares.
 
   #+CAPTION: Szudzik pairing function (image from [[https://drhagen.com/blog/superior-pairing-function/][drhagen's blog]])
   #+NAME: fig:cantor_pairing
@@ -248,7 +247,7 @@ and its inverse
 This is implemented in C++20 as
 follows
 
-#+include: ./code/basic.cpp src c++ :lines "9-30"
+#+include: ./code/basic.cpp src c++ :lines "14-41"
 
 We had to take some care of integer promotion shenanigans using
 =std::common_type=, implement an integer square root by hand to keep
