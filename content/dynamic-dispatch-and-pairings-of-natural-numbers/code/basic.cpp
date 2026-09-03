@@ -20,7 +20,7 @@ constexpr T isqrt(T x) {
 }
 
 template <std::integral T, std::integral S, typename I>
-constexpr std::pair<T, S> szudzik_unpair(I) {
+constexpr std::pair<T, S> szudzik_unpair(I /* integral_constant */) {
     constexpr auto x = I::value;
     constexpr auto q = isqrt(x);
     constexpr auto l = x - q * q;
