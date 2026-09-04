@@ -1,22 +1,22 @@
 #+options: ^:nil
 #+title: State machines, dynamic multi-dispatch, and pairings of natural numbers
 
-Recently at work I had to write a state machine in C++20. At the
-expense of being redundant given the target audience of this post, let
-us recall that a state machine evolves over time by changing its
-internal state each time it is fed some input. Having to execute some
-logic based on /both/ the current state and the input being fed
-implies implementations must use some kind of /dynamic multi-dispatch/
-technique.
+Recently at work I had to write a finite state machine (FSM) in
+C++20. At the expense of being redundant for the target audience of
+this post, lets recall that a state machine evolves over time by
+changing its internal state each time it is fed some input. Having to
+execute logic based on /both/ the current state and the input being
+fed implies implementations must use some kind of /dynamic
+multi-dispatch/ technique.
 
 
-In C++ there are well-known approaches to do this using =std::variant=
-and =std::visit= (see [[https://khuttun.github.io/2017/02/04/implementing-state-machines-with-std-variant.html][Kalle Huttunen's post]], [[https://github.com/mpusz/fsm-variant][Mateusz Pusz's library]],
-or similar).  It is also possible to implement with inheritance-based
-dynamic polymorphism using something like the visitor pattern.  The
-problem is that due to circumstances of life and past decisions (of my
-authoring) the dispatch mechanism must not be based on types, but
-based on =enum= values.
+In C++ there are well-known approaches to implement state machines
+using =std::variant= and =std::visit= (see [[https://khuttun.github.io/2017/02/04/implementing-state-machines-with-std-variant.html][Kalle Huttunen's post]],
+[[https://github.com/mpusz/fsm-variant][Mateusz Pusz's library]], or similar).  It is also possible to do this
+with inheritance-based dynamic polymorphism using something like the
+visitor pattern.  The problem is that due to circumstances of life and
+past decisions (of my authoring) the dispatch mechanism must not be
+based on types, but based on =enum= values.
 
 
 Using some mathematical and metaprogramming tricks the problem can be
@@ -27,8 +27,8 @@ all, but I found this cool anyways.
 
 * The problem setup
 
-In order to have something concrete in mind, we will use the finite
-state machine (FSM) described by the following transition table
+In order to have something concrete in mind, we will use the FSM
+described by the transition table below
 
 | State\Event   | a | b | c |
 |---------------+---+---+---|
@@ -55,75 +55,42 @@ behavior based on the value of state and input:
 But this has a couple of issues:
 
 1. **Maintainability**: These =enum= enumerate a short list of values,
-   my practical case would not fit as nicely in the page nor the code
-   would be as easy to follow.  Regardless, my initial solution was
-   this simple and I found it was not only hard to read, but also it
-   made some other trade-offs which ended up introducing some
-   technical debt (likely just a skill-issue of mine).
+   some practical FSMs would not fit as nicely in the page.  In spite
+   of that, my initial solution was this simple and I found it was
+   somewhat hard to maintain as it is easy to entangle the dispatching
+   logic with other business logic when there is no clear line
+   separating one from the other.
 
-2. **Double jumps**: The example above does not have /one/ jump, but
-   two!  First there is a jump based on =state=, then there is a jump
-   based on =input=. My hypothesis is that this is potentially
-   problematic for the CPU and the compiler:
+2. **Suboptimal?**: Maybe, I have not played with (profiled) =switch=
+   optimizations as much as [[https://xoranth.net/verb-parse/][other people have]]. But I would like to
+   experiment with branching based on a single value that encodes
+   =state= and =input= instead of branching once for each.
 
-   - For the CPU: The extra branching by itself may not be that much
-     of an issue on some modern CPUs as long as the transition
-     patterns are [[https://lemire.me/blog/2026/03/18/how-many-branches-can-your-cpu-predict/][predictible]]. However, the double jump may be
-     problematic to the instruction cache (the intermediate =case=
-     blocks may be too far apart, e.g. due to =-malign-labels=), or
-     make inefficient use of the instruction fetch unit (e.g. Skylake
-     fetches 16 bytes per cycle).
+   =switch= lowering depends on [[https://youtu.be/gMqSinyL8uk][a lot of stuff]], in particular the
+   distribution of the values on the =case= labels seems to be very
+   relevant. A dense distribution encourages the emision of compactly
+   represented /jump tables/, so we can hopefully come up with an
+   encoding that promotes dense labels.
 
-   - <<switch-lowering>> /"Huh, but the compiler will surely optimize
-     away the nesting"/: It turns out compilers are not that good at
-     optimizing nested switches --- check this simple example on
-     [[https://godbolt.org/z/Y15sGc61e][Compiler Explorer and GCC 11.2]].  Lowering of =switch= statements
-     depends on [[https://youtu.be/gMqSinyL8uk][a lot of stuff]], in particular the distribution of the
-     values on the =case= labels seems to be very relevant.  Having a
-     dense distribution of these values when there is a large number
-     of cases encourages the compiler to generate /jump tables/,
-     deemed more #performant than the alternative trickery (search
-     algorithms, apparently).
 
-So now we will try to come up with something nicer, which hopefully
-requires a single jump and provides some improvement in
-maintainability by generating the jump table automatically at compile
-time --- although some would argue the resulting template
-metaprogramming becomes the new maintainability burden, a valid point.
+Now we will try to come up with something nicer which satisfies these
+criteria.
 
 * The math
 
-Summarizing, we need to convert the double jump caused by a nested
-=switch= into a single jump. Each =case= label is associated to *one*
-=integral= value. A double jump therefore requires *two* =integral=
-values to dispatch. Therefore we need to:
+In order to convert a decision based on two =integral= values into a
+decision based on one =integral= value, we need some math.  But before
+that we will further restrict the problem to work with =unsigned
+integral=.
 
-1. *convert* /two =integral= values into one =integral= value/ at
-   *compile-time*, and
+The problem at hand now screams for a solution based on [[https://en.wikipedia.org/wiki/Pairing_function][pairing
+functions]] (an invertible function between $\mathbb{N}$ and $\mathbb{N}
+\times \mathbb{N}$). There are [[https://drhagen.com/blog/superior-pairing-function/][many pairing functions]], I considered
+the following:
 
-2. *convert back* /one =integral= value into two =integral= values/,
-   at *compile-time*.
-
-For this section we leave the compile time requirements aside and deal
-only with the conversions.  Moreover, we will restrict the problem to
-=unsigned integral= values. The resulting problem screams [[https://en.wikipedia.org/wiki/Pairing_function][pairing
-function]]!
-
-
-Note. One-paragraph-context for those not familiarized with the
-concept: a pairing function is an invertible function (a bijection)
-between the set of natural numbers ($\mathbb{N}$) and the set of pairs
-of natural numbers ($\mathbb{N} \times \mathbb{N}$).  Pairing
-functions are used, for example, to demonstrate that $\mathbb{N}$ and
-$\mathbb{N} \times \mathbb{N}$ have the same "size" --- an unintuitive
-result at first because a finite set $S$ does not have a bijection
-with $S \times S$, but things become odd when sets are infinite.
-
-There are [[https://drhagen.com/blog/superior-pairing-function/][many pairing functions]], I considered the following:
-
-- Pairing based on the [[https://en.wikipedia.org/wiki/Fundamental_theorem_of_arithmetic][Fundamental Theorem of Arithmetic]]. This pairing
-  function uses the fact that any integer greater than $1$ has a
-  unique representation as a product of powers of primes.  Such a
+- Pairing based on the [[https://en.wikipedia.org/wiki/Fundamental_theorem_of_arithmetic][Fundamental Theorem of Arithmetic]] (FTA).  This
+  pairing function uses the fact that any integer greater than $1$ has
+  a unique representation as a product of powers of primes.  Such a
   pairing $f$ can be defined as
 
   \[
@@ -133,51 +100,46 @@ There are [[https://drhagen.com/blog/superior-pairing-function/][many pairing fu
   After staring at the definition of $f$ for a while, it is clear that
   we cannot use this pairing for at least two reasons:
 
-  - First, the range of $f$ is too sparse. Two numbers in the range of
-    $f$ have a gap between them of at least a factor of $2$ between
-    them.  This is likely to have a [[switch-lowering][negative effect on the code
-    generated]] for the =switch= whose =case= labels are associated to a
-    subset of the range of $f$.
+  1. First, the range of $f$ is too sparse. Two numbers in the range of
+     $f$ have a gap between them of at least a factor of $2$ between
+     them.  This is unlikely to encourge the emision of jump tables.
 
-  - The second problem has to do with the finite nature of computers.
-    In computers we do not work with $\mathbb{N}$, but with
-    =std::uint64_t= at best (leaving =BigInt= out of the question, we
-    are doing #performance). Trouble would arise when the sum of the
-    =enum= values $a$ and $b$ being mapped is equal to or greater than
-    $64$, because
+  2. The second problem is related to the finite nature of computers.
+     If we worked with =std::uint64_t=, trouble would arise when the
+     sum of the =enum= values $a$ and $b$ being mapped is equal to or
+     greater than $64$ because
 
-      \[ f(a,b) \geq 2^a3^b \geq 2^{a+b} \gt 2^{64}-1 \]
+     \[ f(a,b) \geq 2^a3^b \geq 2^{a+b} \gt 2^{64}-1, \]
 
-    overflows =std::uint64_t=!
+     i.e., =std::uint64_t= would be overflown! $\mathbb{N} \neq$ =std::uint64_t=.
 
   (For those interested in the inverse $f^{-1}$, I recommend the
-  introductory chapters on recursive functions in [[https://www.cambridge.org/core/books/computability-and-logic/440B4178B7CBF1C241694233716AB271][Computability and
-  Logic by Boolos, Burgess, & Jeffrey 5th ed]])
+  introductory chapters on recursive functions in
+  [[https://www.cambridge.org/core/books/computability-and-logic/440B4178B7CBF1C241694233716AB271][Computability
+  and Logic by Boolos, Burgess, & Jeffrey 5th ed]])
 
-- The [[https://en.wikipedia.org/wiki/Pairing_function#Cantor_pairing_function][Cantor pairing function]] is historically the first pairing
-  function (as far as I know). It can be visualized in the a 2D graph
-  as a walk through the diagonals of the graph.
+- The [[https://en.wikipedia.org/wiki/Pairing_function#Cantor_pairing_function][Cantor pairing function]] (to my knowledge the oldest pairing
+  function) can be visualized in the a 2D graph as a walk through the
+  diagonals of the graph.
 
   #+CAPTION: Cantor pairing function (image from [[https://drhagen.com/blog/superior-pairing-function/][drhagen's blog]])
   #+NAME: fig:cantor_pairing
   [[file:img/cantor_pairing_light.svg]]
 
-  Hopefully it is not hard to observe that the Cantor pairing function
-  is not as overflow prone as the one based on the Fundamental Theorem
-  of Arithmetic (the gap between subsequent steps of the walk does not
-  increase by powers of $2$). However --- as shown in
-  [[https://www.vertexfragment.com/ramblings/cantor-szudzik-pairing-functions/][this
-  blog that does a much better job than I can at explaining the
-  sparsity of the function]] --- even for the set $S := \{(x, y) \in
-  \mathbb{N} \times \mathbb{N} : x, y \lt 10 \}$ we get lots of gaps
-  in the subset of the range of the Cantor function corresponding to
-  $S$.  We can do much better.
+  Hopefully it is clear from the picture that the gap between
+  subsequent steps of the walk does not increase by powers of $2$,
+  hence the range of the Cantor pairing is not as prone to overflow as
+  the FTA pairing. However --- as shown in [[https://www.vertexfragment.com/ramblings/cantor-szudzik-pairing-functions/][this blog that does a much
+  better job than I can at explaining the sparsity of the function]] ---
+  even for a small amount of densely distributed input pairs of
+  relatively low numerical value, the computed outputs are quite
+  sparse for what we would like them to be.  This is solved by the
+  next item on this list.
 
-- The [[http://szudzik.com/ElegantPairing.pdf][Szudzik pairing function]] is relatively recent (given that the
-  last two entries were from the early 1900s and the late 1800s,
-  respectively). It too can be visualized as a walk through a graph,
-  but this time the walk follows the sides of increasingly larger
-  squares.
+- The [[http://szudzik.com/ElegantPairing.pdf][Szudzik pairing function]] is a historically recent pairing
+  function that, like the Cantor pairing, can be visualized as a walk
+  through a graph.  This time the walk can be seen as tracing the
+  perimeter of increasingly larger squares.
 
   #+CAPTION: Szudzik pairing function (image from [[https://drhagen.com/blog/superior-pairing-function/][drhagen's blog]])
   #+NAME: fig:cantor_pairing
@@ -186,7 +148,7 @@ There are [[https://drhagen.com/blog/superior-pairing-function/][many pairing fu
   The approach of Szudzik achieves a very dense range (as shown in the
   aforementioned [[https://www.vertexfragment.com/ramblings/cantor-szudzik-pairing-functions/][blog]] entry), which is perfect for our needs.
 
-So we will go with Szudzik's approach, whose formula reads
+Szudzik pairing formula reads
 
 \begin{equation*}
   s(x, y) :=
@@ -196,7 +158,7 @@ So we will go with Szudzik's approach, whose formula reads
   \end{cases},
 \end{equation*}
 
-and we implement in C++20 as below
+and this is how it looks implemented in C++
 
 #+include: ./code/basic.cpp src c++ :lines "39-43"
 
@@ -206,8 +168,8 @@ integral type that can accommodate for the result of operations
 between =T= / =S=, =T= / =T=, and =S= / =S=.  Enabling
 =-Wsign-conversion= makes the return statement explode due to the
 [[https://en.cppreference.com/cpp/language/usual_arithmetic_conversions][usual arithmetic conversions]], but I'm too lazy to do the (extensive)
-proof by cases that I think could lead to a solution for any =T= and
-=S=.
+proof by cases that I think could get rid of =-Wsign-conversion=
+warnings for any =T= and =S=.
 
 The inverse of the Szudzik pairing is given by
 
@@ -230,24 +192,26 @@ things together.
 
 * The solution
 
-So, lets start off by specifying the signature of the function that
+So lets start off by specifying the signature of the function that
 will perform the whole dynamic dispatch
 
 #+include: ./code/basic.cpp src c++ :lines "113-116"
 
 where =F= is the type of an function invocable with
-=std::integral_constant= types that lift the values of =enum=, and the
-return type is whatever that invocable returns.
+=std::integral_constant= types that correspond to the values of each
+=enum= lifted to types.  The return type is whatever =f= returns.
 
-Then an implementation of the FSM shown at the beginning of the
-previous section would go as follows
+An implementation of the FSM shown at the beginning of the previous
+section could then be
 
 #+include: ./code/basic.cpp src c++ :lines "210-274"
 
 Perhaps it is not the prettiest, but it has the basic machinery to get
-going. Aliases and what not can be used to prettify in the aftermath.
+going. Aliases and what not can be used to prettify the loudly present
+=std::integral_constant= in the aftermath.
+
 Input is fed to the state machine using the =fsm::dispatch_input=
-function:
+function
 
 #+include: ./code/basic.cpp src c++ :lines "276-281"
 
