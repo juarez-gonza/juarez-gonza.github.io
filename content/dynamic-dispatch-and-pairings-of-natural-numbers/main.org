@@ -240,39 +240,79 @@ where =F= is the type of an function invocable with
 return type is whatever that invocable returns.
 
 Then an implementation of the FSM shown at the beginning of the
-previous section from the user side would look as below
+previous section would go as follows
 
 #+include: ./code/basic.cpp src c++ :lines "210-274"
 
 Perhaps it is not the prettiest, but it has the basic machinery to get
 going. Aliases and what not can be used to prettify in the aftermath.
+Input is fed to the state machine using the =fsm::dispatch_input=
+function:
+
+#+include: ./code/basic.cpp src c++ :lines "276-281"
 
 ** The strategy
 
-1. (compile time) For each =enum= (i.e., =StateT=, =InputT=), list its
-   values.
+1. (at compile time) For each =enum= (i.e., =StateT=, =InputT=), list
+   its values.
 
-2. (compile time) For each =enum=, map its values to per =enum= unique
-   =unsigned integral= values. This map must be a bijective function
-   $g$ --- we will need to undo this mapping later with $g^{-1}$.
+   - If using C++26's reflection, then this is quite straightforward.
 
-3. (compile time) Obtain the cartesian product of the lists of
+   - Another option is to require the user to provide some
+     compile-time constant where the values are listed and make that
+     list queryable via some class-specialization hook. This poses
+     either a burden on maintainability or requires using [[https://www.reddit.com/r/cpp/comments/110ddo1/comment/j88qt0g/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button][macros]] of
+     some sort to ensure consistency of enumerated values between
+     =enum= definition and the definition of the associated list of
+     values.
+
+   - Use the infamous [[https://github.com/Neargye/magic_enum][magic_enum]] library. This is the approach we will
+     follow as it provides the most ergonomic solution for C++20, at
+     the expense of some compilation time maybe.
+
+2. (at compile time) For each =enum=, map its values to per =enum=
+   unique =unsigned integral= values which will, in the next step, be
+   used for the =sudzik_pair= encoding. This map must be a bijective
+   function $g$ because we will need to undo this mapping later with
+   $g^{-1}$.
+
+   - This function in principle could be anything that satisfies these
+     requirements. =iota= would do the trick, but we would need to
+     keep some compile time dictionary to know which enum value
+     corresponds to said index.  Moreover, at a later stage the
+     runtime values =state= and =input= must be converted by $g$, so
+     it should have a time complexity of $O(1)$ as it will execute at
+     runtime and must not pessimize what a standalone =switch=
+     lowering would have emmited from switching on the =enum=
+     itself. It is at this last point where =iota= would fail, as it
+     would require some sort of search over the list of values of the
+     =enum= on every case, whereas the compiler lowering of a =switch=
+     only does such searches in adverse code generation cases.
+
+   - Since we have restricted our work to =unsigned integral=, we
+     could just rely on the underlying type representation of the
+     =enum=.  If the =enum= values themselves are sparse, then this
+     approach would inherit that problem into the generated
+     =switch=. In any case, the user wouldn't be any better
+     hand-rolling the =switch= as the same problem would arise.
+
+3. (at compile time) Obtain the cartesian product of the lists of
    =unsigned integral= values.
 
-4. (compile time) Map each element in the cartesian product to a
+4. (at compile time) Map each element in the cartesian product to a
    single =unsigned integral= using =szudzek_pair=.
 
-5. (compile time) Use the resulting list of =unsigned integral= to
+5. (at compile time) Use the resulting list of =unsigned integral= to
    construct a flat =switch=.
 
-6. (compile-time) Since the associated value to a =case= is constant,
-   use =szudzek_unpair= and $g^{-1}$ to obtain compile time values
-   $(x, y)$ for each possible =case= label and invoke the argument
-   function =f= using =integral_constant= tags constructed from $x$
-   and $y$.
+6. (at compile time) Since the associated value to a =case= is
+   constant, use =szudzek_unpair= and $g^{-1}$ to obtain compile time
+   values $(x, y)$ for each possible =case= label and invoke the
+   argument function =f= using =integral_constant= tags constructed
+   from $x$ and $y$.
 
-7. (runtime) For the input =state= and =input= obtain its encoding $s$
-   using =szudzek_pair=.
+7. (at runtime) For the input =state= and =input= obtain its encoding
+   $s$ as a function of $g$ followed by =szudzek_pair=.
 
 8. (runtime) Dispatch over the flat =switch= with $s$ as argument.
 
