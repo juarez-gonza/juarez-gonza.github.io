@@ -15,14 +15,15 @@ using =std::variant= and =std::visit= (see [[https://khuttun.github.io/2017/02/0
 [[https://github.com/mpusz/fsm-variant][Mateusz Pusz's library]], or similar).  It is also possible to do this
 with inheritance-based dynamic polymorphism using something like the
 visitor pattern.  The problem is that due to circumstances of life and
-past decisions (of my authoring) the dispatch mechanism must not be
-based on types, but based on =enum= values.
+past decisions (of my authoring) the dispatch mechanism I had to
+implement was not based on types, but based on =enum= values.
 
 
 Using some mathematical and metaprogramming tricks the problem can be
-solved and even extended to work for the n-ary case --- maybe not
-something I'd recommend if compilation times are of any concern at
-all, but I found this cool anyways.
+solved and even extended to work for the n-ary case --- although maybe
+the solution here presented is not something I'd recommend if
+compilation times are of any concern at all, but I found this cool
+anyways.
 
 
 * The problem setup
@@ -37,11 +38,12 @@ described by the transition table below
 | C             | C | B | D |
 | D (final)     | - | - | - |
 
-where '-' is used to indicate that there are no transitions from
-state-input pair at all and we consider that to be an error.  We could
-make instead an error state and have several final states, that would
-not affect our multi-dispatch solution so let us not waste time in the
-finer semantic details of the FSM.
+where '-' is used to indicate that there are no transitions from the
+=(state, input)= pair of the given row and column, reaching such
+transitions is considered an error.  We could make instead an error
+state and have several final states, that would not affect our
+multi-dispatch solution so let us not waste time in the finer semantic
+details of the FSM.
 
 The =enum= types for this state machine are defined as follows
 
@@ -54,23 +56,20 @@ behavior based on the value of state and input:
 
 But this has a couple of issues:
 
-1. **Maintainability**: These =enum= enumerate a short list of values,
-   some practical FSMs would not fit as nicely in the page.  In spite
-   of that, my initial solution was this simple and I found it was
-   somewhat hard to maintain as it is easy to entangle the dispatching
-   logic with other business logic when there is no clear line
-   separating one from the other.
+1. **Maintainability**: These =enum= enumerate a short list of values.
+   Some FSMs that show up in practice would not fit as nicely in the
+   page.  In spite of that, my initial solution was this simple.  I
+   found it was somewhat hard to maintain as it is easy to entangle
+   the dispatching logic with other business logic when there is no
+   clear line separating one from the other.
 
-2. **Suboptimal?**: Maybe, I have not played with (profiled) =switch=
-   optimizations as much as [[https://xoranth.net/verb-parse/][other people have]]. But I would like to
-   experiment with branching based on a single value that encodes
-   =state= and =input= instead of branching once for each.
-
-   =switch= lowering depends on [[https://youtu.be/gMqSinyL8uk][a lot of stuff]], in particular the
-   distribution of the values on the =case= labels seems to be very
-   relevant. A dense distribution encourages the emision of compactly
-   represented /jump tables/, so we can try to devise an encoding that
-   promotes dense labels.
+2. **Suboptimal?**: Might be the case. Being honest, I have not played
+   with (profiled) =switch= optimizations as much as [[https://xoranth.net/verb-parse/][other people
+   have]]. But I would like to experiment with branching based on a
+   single value that encodes =state= and =input= instead of branching
+   once for each.  Additionally, it would be nice for these encoded
+   values to be densely distributed, as this encourages the compiler
+   to [[https://youtu.be/gMqSinyL8uk][lower the =switch=]] to a compactly represented /jump table/
 
 
 * The math
@@ -126,24 +125,34 @@ pairing functions]], I considered the following:
   Hopefully it is clear from the picture that the gap between
   subsequent steps of the walk does not increase by powers of $2$,
   hence the range of the Cantor pairing is not as prone to overflow as
-  the FTA pairing. However --- as shown in [[https://www.vertexfragment.com/ramblings/cantor-szudzik-pairing-functions/][this blog that does a much
-  better job than I can at explaining the sparsity of the function]] ---
-  even for a small amount of densely distributed input pairs of
-  relatively low numerical value, the computed outputs are quite
-  sparse for what we would like them to be.  This is solved by the
-  next item on this list.
+  the FTA pairing.  The plot below shows the distribution of encodings
+  of all pairs $(x, y)$ where $x$ and $y$ range from $0$ to $20$.
 
-- The [[http://szudzik.com/ElegantPairing.pdf][Szudzik pairing function]] is a historically recent pairing
-  function that, like the Cantor pairing, can be visualized as a walk
-  through a graph.  This time the walk can be seen as tracing the
-  perimeter of increasingly larger squares.
+  #+CAPTION: Distribution of range of Cantor pairing
+  #+NAME: fig:cantor-20-20  
+  [[file:img/cantor-20-20.png]]
+
+  The histogram is built from $400$ samples yet we notice what seems
+  to be the beginning of a long-tailed distribution that reaches
+  values beyond $700$.  That is, towards larger encoding values the
+  gaps between them is quite large, perhaps too large to encourage
+  /jump tables/ to be generated from them.  This situation is further
+  improved by the next item of this list.
+
+- The [[http://szudzik.com/ElegantPairing.pdf][Szudzik pairing function]], like the Cantor pairing, can be
+  visualized as a walk through a graph.  This time the walk can be
+  seen as tracing the perimeter of increasingly larger squares.
 
   #+CAPTION: Szudzik pairing function (image from [[https://drhagen.com/blog/superior-pairing-function/][drhagen's blog]])
   #+NAME: fig:cantor_pairing
   [[file:img/szudzik_pairing_light.svg]]
 
-  The approach of Szudzik achieves a very dense range (as shown in the
-  aforementioned [[https://www.vertexfragment.com/ramblings/cantor-szudzik-pairing-functions/][blog]] entry), which is perfect for our needs.
+  The approach of Szudzik achieves a very dense, uniform range (see
+  picture below), which is perfect for our needs.
+
+  #+CAPTION: Distribution of range of Szudzik pairing
+  #+NAME: fig:szudzik-20-20  
+  [[file:img/szudzik-20-20.png]]  
 
 Szudzik pairing formula reads
 
