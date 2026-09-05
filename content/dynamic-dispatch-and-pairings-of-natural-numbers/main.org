@@ -41,9 +41,9 @@ described by the transition table below
 where '-' is used to indicate that there are no transitions from the
 =(state, input)= pair of the given row and column, reaching such
 transitions is considered an error.  We could make instead an error
-state and have several final states, that would not affect our
-multi-dispatch solution so let us not waste time in the finer semantic
-details of the FSM.
+state and have several final states. It would not affect our
+multi-dispatch solution, so we wont be wasting any more time in the
+finer details of the FSM construction.
 
 The =enum= types for this state machine are defined as follows
 
@@ -69,20 +69,20 @@ But this has a couple of issues:
    single value that encodes =state= and =input= instead of branching
    once for each.  Additionally, it would be nice for these encoded
    values to be densely distributed, as this encourages the compiler
-   to [[https://youtu.be/gMqSinyL8uk][lower the =switch=]] to a compactly represented /jump table/
+   to [[https://youtu.be/gMqSinyL8uk][lower the =switch=]] to a compactly represented /jump table/.
 
 
 * The math
 
 In order to convert a decision based on two =integral= values into a
-decision based on one =integral= value we need some math.  But before
-that we will further restrict the problem to work with =unsigned
-integral= values (instead of just =integral=).
+decision based on one =integral= value we need some math.  Before
+doing so, however, we will further restrict the problem to work with
+=unsigned integral= values (that is, no negative values).
 
 The problem at hand now screams for a solution based on [[https://en.wikipedia.org/wiki/Pairing_function][pairing
 functions]].  These functions are invertible functions between
 $\mathbb{N}$ and $\mathbb{N} \times \mathbb{N}$. There are [[https://drhagen.com/blog/superior-pairing-function/][many
-pairing functions]], I considered the following:
+pairing functions]].  I considered the following:
 
 - Pairing based on the [[https://en.wikipedia.org/wiki/Fundamental_theorem_of_arithmetic][Fundamental Theorem of Arithmetic]] (FTA).  This
   pairing function uses the fact that any integer greater than $1$ has
@@ -114,9 +114,9 @@ pairing functions]], I considered the following:
   [[https://www.cambridge.org/core/books/computability-and-logic/440B4178B7CBF1C241694233716AB271][Computability
   and Logic by Boolos, Burgess, & Jeffrey 5th ed]])
 
-- The [[https://en.wikipedia.org/wiki/Pairing_function#Cantor_pairing_function][Cantor pairing function]] (to my knowledge the oldest pairing
-  function) can be visualized in the a 2D graph as a walk through the
-  diagonals of the graph.
+- The [[https://en.wikipedia.org/wiki/Pairing_function#Cantor_pairing_function][Cantor pairing function]].  To my knowledge the oldest pairing
+  function. It can be visualized in the a 2D graph as a walk through
+  the diagonals of the graph.
 
   #+CAPTION: Cantor pairing function (image from [[https://drhagen.com/blog/superior-pairing-function/][drhagen's blog]])
   #+NAME: fig:cantor_pairing
@@ -126,7 +126,8 @@ pairing functions]], I considered the following:
   subsequent steps of the walk does not increase by powers of $2$,
   hence the range of the Cantor pairing is not as prone to overflow as
   the FTA pairing.  The plot below shows the distribution of encodings
-  of all pairs $(x, y)$ where $x$ and $y$ range from $0$ to $20$.
+  of all pairs in the set $S := \{(x, y) \in \mathbb{N} : x, y \lt
+  20\}$.
 
   #+CAPTION: Distribution of range of Cantor pairing
   #+NAME: fig:cantor-20-20  
@@ -134,10 +135,9 @@ pairing functions]], I considered the following:
 
   The histogram is built from $400$ samples yet we notice what seems
   to be the beginning of a long-tailed distribution that reaches
-  values beyond $700$.  That is, towards larger encoding values the
-  gaps between them is quite large, perhaps too large to encourage
-  /jump tables/ to be generated from them.  This situation is further
-  improved by the next item of this list.
+  values beyond $700$.  The gap between encodings becomes larger as
+  the encodings themselves attain larger values.  This might be
+  problematic to encourage the generation of /jump tables/.
 
 - The [[http://szudzik.com/ElegantPairing.pdf][Szudzik pairing function]], like the Cantor pairing, can be
   visualized as a walk through a graph.  This time the walk can be
