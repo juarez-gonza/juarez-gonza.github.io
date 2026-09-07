@@ -186,7 +186,7 @@ integral=).
 
 If we ignore the fact that computers work with fix-width integers,
 then we could consider the (unsigned) underlying type of an =enum= to
-be the set of natural numbers $\mathbb{N}$ (including $0$).  This
+be the set of natural numbers $\mathbb{N}$ ($0$ included).  This
 allows us to express the encoding problem in mathematical terms as the
 problem of finding an invertible function from the set of pairs of
 natural numbers $\mathbb{N} \times \mathbb{N}$ to $\mathbb{N}$ ---
@@ -194,7 +194,7 @@ recall invertibility is required at [[step-1-4][step 1.4]] and used at [[step-1-
 
 
 Functions with these characteristics are well-known objects in
-mathematics, called [[https://en.wikipedia.org/wiki/Pairing_function][pairing functions]].  There are [[https://drhagen.com/blog/superior-pairing-function/][many pairing
+mathematics called [[https://en.wikipedia.org/wiki/Pairing_function][pairing functions]].  There are [[https://drhagen.com/blog/superior-pairing-function/][many pairing
 functions]].  I considered the following:
 
 - Pairing based on the [[https://en.wikipedia.org/wiki/Fundamental_theorem_of_arithmetic][Fundamental Theorem of Arithmetic]] (FTA).  This
@@ -209,9 +209,10 @@ functions]].  I considered the following:
   After staring at the definition of $f$ for a while, it is clear that
   we cannot use this pairing for at least two reasons:
 
-  1. First, the range of $f$ is too sparse. Two numbers in the range of
-     $f$ have a gap between them of at least a factor of $2$ between
-     them.  This is unlikely to encourge the emision of jump tables.
+  1. First, the range of $f$ is too sparse. Two numbers in the range
+     of $f$ have a gap between them of at least a factor of $2$
+     between them.  This sparsity is unlikely to encourge the emision
+     of jump tables.
 
   2. The second problem is related to the finite nature of computers.
      If we worked with =std::uint64_t=, trouble would arise when the
@@ -249,8 +250,8 @@ functions]].  I considered the following:
   Even though we are only plotting the first $400$ values (in the
   $L_{\infty}$ metric w.r.t. $(0,0)$), notice that the encodings reach
   values beyond $700$.  The gap between encodings becomes larger as
-  the encodings themselves attain larger values.  This might be
-  problematic to encourage the generation of /jump tables/.
+  the encodings themselves attain larger values.  Again, sparsity
+  might be problematic to encourage the generation of jump tables.
 
 - The [[http://szudzik.com/ElegantPairing.pdf][Szudzik pairing function]], like the Cantor pairing, can be
   visualized as a walk through a graph.  In this case the walk can be
