@@ -435,10 +435,10 @@ and its inverse
 
 <<eq-6>>
 \begin{equation}
- e^{-n}(x) :=
+ e^{-n}(u) :=
    \begin{cases}
-    x &\text{if } n = 1\\
-    c(e^{n - 1}(\pi_0(e^{-1}(x))), \pi_1(e^{-1}(x))) &\text{otherwise}
+    u &\text{if } n = 1\\
+    c(e^{n - 1}(\pi_0(e^{-1}(u))), \pi_1(e^{-1}(u))) &\text{otherwise}
   \end{cases}.
 \end{equation}
 
