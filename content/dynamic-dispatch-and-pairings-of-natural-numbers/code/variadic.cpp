@@ -366,7 +366,7 @@ struct fsm {
 
     [[nodiscard]] constexpr bool done() const { return s == states::D; }
 
-    constexpr void dispatch_event(events e) { dispatch_enum(*this, s, e); };
+    constexpr void transition(events e) { dispatch_enum(*this, s, e); };
     states s{states::A};
 };
 
@@ -400,9 +400,9 @@ struct triple_arg_dispatch {
 
 int main() {
     auto f = fsm{};
-    f.dispatch_event(events::b);
-    f.dispatch_event(events::b);
-    f.dispatch_event(events::c);
+    f.transition(events::b);
+    f.transition(events::b);
+    f.transition(events::c);
     assert(f.done());
 
     dispatch_enum(single_arg_dispatch{}, states::A);

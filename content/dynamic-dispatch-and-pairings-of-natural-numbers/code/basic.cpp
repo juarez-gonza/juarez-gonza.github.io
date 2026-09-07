@@ -346,15 +346,15 @@ struct fsm {
 
     [[nodiscard]] constexpr bool done() const { return s == states::D; }
 
-    constexpr void dispatch_input(inputs e) { dispatch_enum(*this, s, e); };
+    constexpr void transition(inputs e) { dispatch_enum(*this, s, e); };
     states s{states::A};
 };
 
 int main() {
     auto f = fsm{};
-    f.dispatch_input(inputs::b);
-    f.dispatch_input(inputs::b);
-    f.dispatch_input(inputs::c);
+    f.transition(inputs::b);
+    f.transition(inputs::b);
+    f.transition(inputs::c);
     assert(f.done());
     return 0;
 }
