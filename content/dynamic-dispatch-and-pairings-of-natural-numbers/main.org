@@ -310,6 +310,11 @@ Here we had to implement our own =unsigned integral= approximation of
 the square root and take some precautions to preserve =constexpr=, but
 nothing too crazy.
 
+
+Filling the missing blanks at this point is just a matter of
+programming, I will leave the full solution in this [[https://godbolt.org/z/WzbMofvKh][Compiler Explorer]]
+link.
+
 * Beyond the solution: going variadic
 
 * Conclusion
