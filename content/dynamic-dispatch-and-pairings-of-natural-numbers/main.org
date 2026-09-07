@@ -19,14 +19,13 @@ dispatch mechanism I had to implement was not based on types, but
 based on =enum= values.
 
 
-I solved this problem using some mathematical and metaprogramming
-tricks which I will present throughout this post. After presenting the
-solution for the dyadic case, I will also present its full
-generalization to dynamic dispatch based on a variadic number of
-=enum=.
+I solved this problem using some maths and metaprogramming which I
+will present throughout this post. After presenting the solution for
+the binary case, I will also present its full generalization to
+dynamic dispatch based on an arbitrary number of =enum=.
 
 
-* The problem setup
+* Problem setup
 
 In order to have something concrete in mind, we will use the finite
 state machine (FSM) described by the transition table below
@@ -48,14 +47,14 @@ construction.
 
 The =enum= types for this state machine are defined as follows
 
-#+include: ./code/basic.cpp src c++ :lines "192-194"
+#+include: ./code/basic.cpp src c++ :lines "281-283"
 
 A naive solution can make use of nested conditionals to choose a
 behavior based on the value of state and input:
 
 #+include: ./code/bad_switch_opt.cpp src c++ :lines "20-68"
 
-But this has a couple of issues:
+But this has a couple potential issues:
 
 1. **Maintainability**: These =enum= enumerate a short list of values.
    Some FSMs that show up in practice would not fit as nicely in the
@@ -64,17 +63,115 @@ But this has a couple of issues:
    dispatching logic with other business logic when there is no clear
    line separating one from the other.
 
-2. **Suboptimal?**: Might be the case. Being honest, I have not played
-   with (profiled) =switch= optimizations as much as [[https://xoranth.net/verb-parse/][other people
-   have]]. But I would like to experiment with branching based on a
-   single value that encodes =state= and =input= instead of
-   sequentially branching based on individual =enum= values.
-   Additionally, it would be nice for these encoded values to be
-   densely distributed, as this encourages the compiler to [[https://youtu.be/gMqSinyL8uk][lower the
-   =switch=]] to a compactly represented /jump table/.
+2. **Suboptimal?**: Maybe. Being honest, I have not played with
+   (profiled) =switch= optimizations as much as [[https://xoranth.net/verb-parse/][other people have]]. But
+   I would like to experiment with branching based on a single value
+   that encodes =state= and =input= instead of sequentially branching
+   based on individual =enum= values.  Additionally, it would be nice
+   for these encoded values to be densely distributed, as this
+   encourages the compiler to [[https://youtu.be/gMqSinyL8uk][lower the =switch=]] to a compactly
+   represented /jump table/.
 
 
-* The math
+* Strategy
+
+We are going to start off by specifying the signature of the function
+that performs dynamic dispatch over =enum= values
+
+#+include: ./code/basic.cpp src c++ :lines "203-207"
+
+where =F= is the type of an function invocable with =enum_value= type
+tags that lift the values of enumerated by =StateT= and =InputT=
+(basically a type alias to =std::integral_constant=).  The return type
+is whatever =f= returns.
+
+The previously described FSM can be implemented using =dispatch_enum=
+in the following manner:
+
+#+include: ./code/basic.cpp src c++ :lines "299-352"
+
+Input is fed to the state machine using the =fsm::dispatch_input=
+function.
+
+#+include: ./code/basic.cpp src c++ :lines "354-359"
+
+From the signature of =dispatch_enum= we can already come up with a
+rough plan to achieve what we want.
+
+1. Compile time work
+   1. List the values enumerated by =StateT= and =InputT=, denote them
+      =states= and =inputs=, respectively.
+
+      # - If using C++26's reflection, then this is quite straightforward.
+
+      # - Another option is to require the user to provide some
+      #   compile-time constant where the values are listed and make that
+      #   list queryable via some class-specialization hook. This poses
+      #   either a burden on maintainability or requires using [[https://www.reddit.com/r/cpp/comments/110ddo1/comment/j88qt0g/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button][macros]] of
+      #   some sort to ensure consistency of enumerated values between
+      #   =enum= definition and the definition of the associated list of
+      #   values.
+
+      # - Use the infamous [[https://github.com/Neargye/magic_enum][magic_enum]] library. This is the approach we will
+      #   follow as it provides the most ergonomic solution for C++20, at
+      #   the expense of some compilation time maybe.
+
+   2. Map each value in =states= to a distinct =integral=.  Do the
+      same with =inputs=.  Notice one input and one state may share a
+      mapping value. Denote that mapping function by =u=.
+
+      # - This function in principle could be anything that satisfies these
+      #   requirements. =iota= would do the trick, but we would need to
+      #   keep some compile time dictionary to know which enum value
+      #   corresponds to said index.  Moreover, at a later stage the
+      #   runtime values =state= and =input= must be converted by $g$, so
+      #   it should have a time complexity of $O(1)$ as it will execute at
+      #   runtime and must not pessimize what a standalone =switch=
+      #   lowering would have emmited from switching on the =enum=
+      #   itself. It is at this last point where =iota= would fail, as it
+      #   would require some sort of search over the list of values of the
+      #   =enum= on every case, whereas the compiler lowering of a =switch=
+      #   only does such searches in adverse code generation cases.
+
+      # - Since we have restricted our work to =unsigned integral=, we
+      #   could just rely on the underlying type representation of the
+      #   =enum=.  If the =enum= values themselves are sparse, then this
+      #   approach would inherit that problem into the generated
+      #   =switch=. In any case, the user wouldn't be any better
+      #   hand-rolling the =switch= as the same problem would arise.
+
+   3. Obtain the cartesian product of the lists of =integral= values
+      from the previous step.
+
+   4. Encode each pair in the cartesian product to a unique =integral=
+      using an encoding function =e=.  Denote the resulting list by
+      =encodings=.
+
+      The last three steps can be summarized in a mathematical formula
+      as obtaining the set
+
+      \[\{ e(u(state), u(input)) : state \in StateT, input \in InputT\}.\]
+
+   5. Construct a dispatching mechanism (=switch=) based
+      on a single runtime value, using =encodings= as the
+      discriminants (=case= labels).
+
+   6. Inside each =case=, where the associated label =l= is known at
+      compile time, use the inverse of the encoding function =e= and
+      the inverse of =u= to obtain compile time values =(x, y)= such
+      that =e(u(x), u(y)) = l=, and invoke the argument function =f=
+      using =enum_values= tags constructed from =x= and =y=.
+
+2. Runtime work
+
+   1. Obtain the encoding of the input arguments =encoded =
+      e(u(state), u(input))=.
+
+   2. Dispatch using =encoded= as the sole argument on which branching
+      is based.
+
+
+* Math
 
 In order to solve the encoding problem in which we convert a decision
 based on two =integral= values into a decision based on one =integral=
@@ -181,7 +278,7 @@ Szudzik pairing formula reads
 
 and this is how it looks implemented in C++
 
-#+include: ./code/basic.cpp src c++ :lines "39-43"
+#+include: ./code/basic.cpp src c++ :lines "126-130"
 
 Note. =unsigned_arithmetic_result_t= is similar to
 =std::common_type_t= in spirit. It is basically the smallest unsigned
@@ -204,108 +301,12 @@ The inverse of the Szudzik pairing is given by
 
 which is implemented by
 
-#+include: ./code/basic.cpp src c++ :lines "49-77"
+#+include: ./code/basic.cpp src c++ :lines "136-164"
 
 Here we had to implement our own =unsigned integral= approximation of
 the square root and take some precautions to preserve =constexpr=, but
 nothing too crazy. Now we only need some strategy and some
 metaprogramming to glue things together.
-
-* The strategy
-
-Lets start off by specifying the signature of the function that will
-perform the whole dynamic dispatch
-
-#+include: ./code/basic.cpp src c++ :lines "113-116"
-
-where =F= is the type of an function invocable with
-=std::integral_constant= types that correspond to the values of each
-=enum= lifted to types.  The return type is whatever =f= returns.
-
-We can expect a user of =dispatch_enum= to implement the FSM described
-beginning of the blog post in the following manner
-
-#+include: ./code/basic.cpp src c++ :lines "210-274"
-
-Input is fed to the state machine using the =fsm::dispatch_input=
-function
-
-#+include: ./code/basic.cpp src c++ :lines "276-281"
-
-Perhaps there is a lot of =std::integral_constant= visual clutter, but
-that can be aliased away in the aftermath.  The machinery for
-dispatching based on =state= and =input= is there, and that is more
-central to us.
-
-From the signature of =dispatch_enum= we can already come up with a
-rough plan to achieve what we want.
-
-1. Compile time work
-   1. For each =enum= (=StateT=, =InputT=), list the values it
-      enumerates.
-
-      # - If using C++26's reflection, then this is quite straightforward.
-
-      # - Another option is to require the user to provide some
-      #   compile-time constant where the values are listed and make that
-      #   list queryable via some class-specialization hook. This poses
-      #   either a burden on maintainability or requires using [[https://www.reddit.com/r/cpp/comments/110ddo1/comment/j88qt0g/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button][macros]] of
-      #   some sort to ensure consistency of enumerated values between
-      #   =enum= definition and the definition of the associated list of
-      #   values.
-
-      # - Use the infamous [[https://github.com/Neargye/magic_enum][magic_enum]] library. This is the approach we will
-      #   follow as it provides the most ergonomic solution for C++20, at
-      #   the expense of some compilation time maybe.
-
-   2. For each =enum=, map each value it enumerates to a distinct
-      =unsigned integral=.  Denote that mapping function by $g$ and
-      note the restriction of inupts being mapped to /distinct/
-      outputs makes it invertible.
-
-      # - This function in principle could be anything that satisfies these
-      #   requirements. =iota= would do the trick, but we would need to
-      #   keep some compile time dictionary to know which enum value
-      #   corresponds to said index.  Moreover, at a later stage the
-      #   runtime values =state= and =input= must be converted by $g$, so
-      #   it should have a time complexity of $O(1)$ as it will execute at
-      #   runtime and must not pessimize what a standalone =switch=
-      #   lowering would have emmited from switching on the =enum=
-      #   itself. It is at this last point where =iota= would fail, as it
-      #   would require some sort of search over the list of values of the
-      #   =enum= on every case, whereas the compiler lowering of a =switch=
-      #   only does such searches in adverse code generation cases.
-
-      # - Since we have restricted our work to =unsigned integral=, we
-      #   could just rely on the underlying type representation of the
-      #   =enum=.  If the =enum= values themselves are sparse, then this
-      #   approach would inherit that problem into the generated
-      #   =switch=. In any case, the user wouldn't be any better
-      #   hand-rolling the =switch= as the same problem would arise.
-
-   3. Obtain the cartesian product of the lists of =unsigned integral=
-      values from the previous step.
-
-   4. Map each element in the cartesian product to a single =unsigned
-      integral= using =szudzik_pair=.
-
-   5. Use the resulting list of =unsigned integral= to construct a
-      =switch= based on a single runtime vaulue.
-
-   6. Since the associated value to a =case= is constant, use
-      =szudzik_unpair= and the inverse of $g$ to obtain compile time
-      values $(x, y)$ for each possible =case= label, and invoke the
-      argument function =f= using =integral_constant= tags constructed
-      from $x$ and $y$.
-
-2. Runtime work
-
-   1. Obtain the encoding, =encoded=, of the arguments by applying $g$
-      separately to each argument and invoking =szudzik_pair= on the
-      resulting =unsigned integral= values.
-
-   2. Dispatch using =encoded= as the sole argument on which branching
-      is based.
 
 * Beyond the solution: going variadic
 

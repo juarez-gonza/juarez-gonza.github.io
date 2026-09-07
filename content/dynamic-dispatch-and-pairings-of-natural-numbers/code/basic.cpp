@@ -5,6 +5,93 @@
 #include <limits>
 #include <magic_enum.hpp>
 
+//////////////////////////////
+////////// NTTP TUP //////////
+//////////////////////////////
+
+#include <boost/mp11.hpp>
+#include <utility>
+
+template <std::size_t MaxCount, typename Is, typename... Ts>
+struct tup_impl;
+
+template <>
+struct tup_impl<0, std::index_sequence<>, boost::mp11::mp_list<>> {
+    static constexpr std::size_t size = 0;
+};
+
+template <std::size_t MaxCount, std::size_t I, typename T>
+struct tup_impl<MaxCount, std::index_sequence<I>, boost::mp11::mp_list<T>> {
+    static constexpr std::size_t size = MaxCount;
+    T x;
+    constexpr T get(
+        std::integral_constant<std::size_t, MaxCount - I - 1>) const {
+        return x;
+    }
+};
+
+template <std::size_t MaxCount, std::size_t I, std::size_t... Is, typename T,
+          typename... Ts>
+struct tup_impl<MaxCount, std::index_sequence<I, Is...>,
+                boost::mp11::mp_list<T, Ts...>>
+    : tup_impl<MaxCount, std::index_sequence<Is...>,
+               boost::mp11::mp_list<Ts...>> {
+    T x;
+    using tup_impl<MaxCount, std::index_sequence<Is...>,
+                   boost::mp11::mp_list<Ts...>>::get;
+    constexpr T get(
+        std::integral_constant<std::size_t, MaxCount - I - 1>) const {
+        return x;
+    }
+};
+
+// NOTE: mp11 to reverse the list so that the aggregate initialization order
+// corresponds to the tomplate parameter order
+template <typename... Ts>
+struct tup : tup_impl<sizeof...(Ts), std::make_index_sequence<sizeof...(Ts)>,
+                      boost::mp11::mp_reverse<boost::mp11::mp_list<Ts...>>> {};
+
+template <typename... Ts>
+tup(Ts...) -> tup<Ts...>;
+
+template <typename... Ts>
+struct is_tup_ : std::false_type {};
+template <typename... Ts>
+struct is_tup_<tup<Ts...>> : std::true_type {};
+template <typename... Ts>
+concept is_tup = is_tup_<Ts...>::value;
+
+template <std::size_t i>
+constexpr auto p(is_tup auto t) {
+    return t.get(std::integral_constant<std::size_t, i>{});
+}
+
+template <typename... Ts>
+constexpr tup<Ts...> tup_cat(tup<Ts...> xs) {
+    return xs;
+}
+
+template <typename... Ts, typename... Us>
+constexpr tup<Ts..., Us...> tup_cat(tup<Ts...> xs, tup<Us...> ys) {
+    constexpr auto tup_cat_ =
+        []<std::size_t... Is, std::size_t... Js>(
+            tup<Ts...> xs, std::index_sequence<Is...>, tup<Us...> ys,
+            std::index_sequence<Js...>) -> tup<Ts..., Us...> {
+        return {p<Is>(xs)..., p<Js>(ys)...};
+    };
+    return tup_cat_(xs, std::make_index_sequence<sizeof...(Ts)>(), ys,
+                    std::make_index_sequence<sizeof...(Us)>());
+}
+
+constexpr auto operator+(is_tup auto xs, is_tup auto ys) {
+    return tup_cat(xs, ys);
+}
+
+template <is_tup... Ts>
+constexpr auto tup_cat(Ts... xss) {
+    return (tup{} + ... + xss);
+}
+
 /////////////////////////////////////
 ////////// SZUDZIK PAIRING //////////
 /////////////////////////////////////
@@ -110,9 +197,13 @@ using mp_enum_values_to_underlying =
 //////// DISPATCH ENUM FUNCTION /////////
 /////////////////////////////////////////
 
+template <auto... v>
+using enum_values = std::integral_constant<decltype(tup{v...}), tup{v...}>;
+
 template <typename StateT, typename InputT, typename F>
     requires std::is_enum_v<StateT> and std::is_enum_v<InputT>
-constexpr auto dispatch_enum(F&& f, StateT state, InputT input) {
+constexpr auto dispatch_enum(F&& f, StateT state, InputT input)
+    -> decltype(std::forward<F>(f)(enum_values<StateT{}, InputT{}>{})) {
     using to_integral_values =
         boost::mp11::mp_compose<mp_enum_to_enum_values,
                                 mp_enum_values_to_underlying>;
@@ -138,11 +229,9 @@ constexpr auto dispatch_enum(F&& f, StateT state, InputT input) {
             szudzik_unpair<std::underlying_type_t<StateT>,
                            std::underlying_type_t<InputT>>(
                 static_cast<encoded_type>(decltype(i)::value));
-        constexpr std::integral_constant<StateT, StateT{decoded_pair.first}>
-            state{};
-        constexpr std::integral_constant<InputT, InputT{decoded_pair.second}>
-            input{};
-        std::forward<decltype(f)>(f)(state, input);
+        std::forward<decltype(f)>(f)(
+            enum_values<StateT{decoded_pair.first},
+                        InputT{decoded_pair.second}>{});
     });
 }
 
@@ -208,60 +297,49 @@ struct attach_enum_value_sequence<inputs> {
 };
 
 struct fsm {
-    void operator()(auto, auto) {
-        throw std::domain_error{"invalid transition"};
-    }
+    void operator()(auto) { throw std::domain_error{"invalid transition"}; }
 
-    void operator()(std::integral_constant<states, states::A>,
-                    std::integral_constant<inputs, inputs::a>) {
+    void operator()(enum_values<states::A, inputs::a>) {
         s = states::A;
         std::cout << "(A, a) -> A\n";
     }
 
-    void operator()(std::integral_constant<states, states::A>,
-                    std::integral_constant<inputs, inputs::b>) {
+    void operator()(enum_values<states::A, inputs::b>) {
         s = states::B;
         std::cout << "(A, b) -> B\n";
     }
 
-    void operator()(std::integral_constant<states, states::A>,
-                    std::integral_constant<inputs, inputs::c>) {
+    void operator()(enum_values<states::A, inputs::c>) {
         s = states::C;
         std::cout << "(A, c) -> C\n";
     }
 
-    void operator()(std::integral_constant<states, states::B>,
-                    std::integral_constant<inputs, inputs::a>) {
+    void operator()(enum_values<states::B, inputs::a>) {
         s = states::B;
         std::cout << "(B, a) -> B\n";
     }
 
-    void operator()(std::integral_constant<states, states::B>,
-                    std::integral_constant<inputs, inputs::b>) {
+    void operator()(enum_values<states::B, inputs::b>) {
         s = states::C;
         std::cout << "(B, b) -> C\n";
     }
 
-    void operator()(std::integral_constant<states, states::B>,
-                    std::integral_constant<inputs, inputs::c>) {
+    void operator()(enum_values<states::B, inputs::c>) {
         s = states::D;
         std::cout << "(B, c) -> D\n";
     }
 
-    void operator()(std::integral_constant<states, states::C>,
-                    std::integral_constant<inputs, inputs::a>) {
+    void operator()(enum_values<states::C, inputs::a>) {
         s = states::C;
         std::cout << "(C, a) -> C\n";
     }
 
-    void operator()(std::integral_constant<states, states::C>,
-                    std::integral_constant<inputs, inputs::b>) {
+    void operator()(enum_values<states::C, inputs::b>) {
         s = states::B;
         std::cout << "(C, b) -> B\n";
     }
 
-    void operator()(std::integral_constant<states, states::C>,
-                    std::integral_constant<inputs, inputs::c>) {
+    void operator()(enum_values<states::C, inputs::c>) {
         s = states::D;
         std::cout << "(C, c) -> D\n";
     }

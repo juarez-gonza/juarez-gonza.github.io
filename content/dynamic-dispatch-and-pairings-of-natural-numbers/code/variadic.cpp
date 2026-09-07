@@ -255,9 +255,13 @@ using mp_enum_values_to_underlying =
 //////// DISPATCH ENUM FUNCTION /////////
 /////////////////////////////////////////
 
+template <auto... v>
+using enum_values = std::integral_constant<decltype(tup{v...}), tup{v...}>;
+
 template <typename F, typename... Enums>
     requires(std::is_enum<Enums>::value and ...)
-constexpr auto dispatch_enum(F&& f, Enums... enums) {
+constexpr auto dispatch_enum(F&& f, Enums... enums)
+    -> decltype(std::forward<F>(f)(enum_values<Enums{}...>{})) {
     using ts = boost::mp11::mp_list<Enums...>;
 
     using ts_integral_values = boost::mp11::mp_transform_q<
@@ -289,8 +293,7 @@ constexpr auto dispatch_enum(F&& f, Enums... enums) {
                     static_cast<encoded_type>(decltype(i)::value));
             return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
                 return std::forward<F>(f)(
-                    std::integral_constant<Enums,
-                                           Enums{p<Is>(decoded_pair)}>{}...);
+                    enum_values<Enums{p<Is>(decoded_pair)}...>{});
             }(std::make_index_sequence<sizeof...(Enums)>{});
         });
 }
@@ -314,109 +317,83 @@ enum class events : std::uint16_t { a = 0, b = 1, c = 2 };
 enum class inputs : std::uint32_t { x = 0, y = 1, z = 2 };
 
 struct fsm {
-    void operator()(auto a, auto b) {
-        throw std::domain_error{"invalid transition"};
-    }
+    void operator()(auto) { throw std::domain_error{"invalid transition"}; }
 
-    void operator()(std::integral_constant<states, states::A>,
-                    std::integral_constant<events, events::a>) {
+    void operator()(enum_values<states::A, events::a>) {
         s = states::A;
         std::cout << "(A, a) -> A\n";
     }
 
-    void operator()(std::integral_constant<states, states::A>,
-                    std::integral_constant<events, events::b>) {
+    void operator()(enum_values<states::A, events::b>) {
         s = states::B;
         std::cout << "(A, b) -> B\n";
     }
 
-    void operator()(std::integral_constant<states, states::A>,
-                    std::integral_constant<events, events::c>) {
+    void operator()(enum_values<states::A, events::c>) {
         s = states::C;
         std::cout << "(A, c) -> C\n";
     }
 
-    void operator()(std::integral_constant<states, states::B>,
-                    std::integral_constant<events, events::a>) {
+    void operator()(enum_values<states::B, events::a>) {
         s = states::B;
         std::cout << "(B, a) -> B\n";
     }
 
-    void operator()(std::integral_constant<states, states::B>,
-                    std::integral_constant<events, events::b>) {
+    void operator()(enum_values<states::B, events::b>) {
         s = states::C;
         std::cout << "(B, b) -> C\n";
     }
 
-    void operator()(std::integral_constant<states, states::B>,
-                    std::integral_constant<events, events::c>) {
+    void operator()(enum_values<states::B, events::c>) {
         s = states::D;
         std::cout << "(B, c) -> D\n";
     }
 
-    void operator()(std::integral_constant<states, states::C>,
-                    std::integral_constant<events, events::a>) {
+    void operator()(enum_values<states::C, events::a>) {
         s = states::C;
         std::cout << "(C, a) -> C\n";
     }
 
-    void operator()(std::integral_constant<states, states::C>,
-                    std::integral_constant<events, events::b>) {
+    void operator()(enum_values<states::C, events::b>) {
         s = states::B;
         std::cout << "(C, b) -> B\n";
     }
 
-    void operator()(std::integral_constant<states, states::C>,
-                    std::integral_constant<events, events::c>) {
+    void operator()(enum_values<states::C, events::c>) {
         s = states::D;
         std::cout << "(C, c) -> D\n";
     }
 
-    constexpr void dispatch_event(events e) { dispatch_enum(*this, s, e); }
-
     [[nodiscard]] constexpr bool done() const { return s == states::D; }
 
-   private:
+    constexpr void dispatch_event(events e) { dispatch_enum(*this, s, e); };
     states s{states::A};
 };
 
 struct single_arg_dispatch {
-    void operator()(std::integral_constant<states, states::A>) {
-        std::cout << "State A\n";
-    }
-
-    void operator()(std::integral_constant<states, states::B>) {
-        std::cout << "State B\n";
-    }
-
-    void operator()(std::integral_constant<states, states::C>) {
-        std::cout << "State C\n";
-    }
+    void operator()(enum_values<states::A>) { std::cout << "State A\n"; }
+    void operator()(enum_values<states::B>) { std::cout << "State B\n"; }
+    void operator()(enum_values<states::C>) { std::cout << "State C\n"; }
 };
 
 struct triple_arg_dispatch {
-    void operator()(auto x, auto y, auto z) {
+    void operator()(auto x) {
+        auto t = decltype(x)::value;
         std::cout << "Invalid transition ("
-                  << static_cast<std::uint16_t>(decltype(x)::value) << ", "
-                  << static_cast<std::uint16_t>(decltype(y)::value) << ", "
-                  << static_cast<std::uint32_t>(decltype(z)::value) << ")\n";
+                  << static_cast<std::uint16_t>(p<0>(t)) << ", "
+                  << static_cast<std::uint16_t>(p<1>(t)) << ", "
+                  << static_cast<std::uint32_t>(p<2>(t)) << ")\n";
     }
 
-    void operator()(std::integral_constant<states, states::A>,
-                    std::integral_constant<events, events::a>,
-                    std::integral_constant<inputs, inputs::x>) {
+    void operator()(enum_values<states::A, events::a, inputs::x>) {
         std::cout << "(A, a, x)\n";
     }
 
-    void operator()(std::integral_constant<states, states::B>,
-                    std::integral_constant<events, events::a>,
-                    std::integral_constant<inputs, inputs::x>) {
+    void operator()(enum_values<states::B, events::a, inputs::x>) {
         std::cout << "(B, a, x)\n";
     }
 
-    void operator()(std::integral_constant<states, states::B>,
-                    std::integral_constant<events, events::b>,
-                    std::integral_constant<inputs, inputs::y>) {
+    void operator()(enum_values<states::B, events::b, inputs::y>) {
         std::cout << "(B, b, y)\n";
     }
 };
