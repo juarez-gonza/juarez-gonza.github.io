@@ -318,92 +318,122 @@ link.
 
 * Beyond the solution: going variadic
 
-Pairing functions in math are often introduced as a way to demonstrate
-that the sets $\mathbb{N}$ and $\mathbb{N} \times \mathbb{N}$ have the
-same "size" (more formally, cardinality).  Quickly after this
-explanation, it often follows that for any finite number of factors,
-the set $\mathbb{N} \times ... \times \mathbb{N}$ has the same "size"
-as the set $\mathbb{N}$, annotated as $\mathbb{N} \times ... \times
-\mathbb{N} \cong \mathbb{N}$.
+Pairing functions such as those seen in the previous chapter are often
+introduced in mathematical literature to demonstrate that the sets
+$\mathbb{N}$ and $\mathbb{N} \times \mathbb{N}$ have the same "size"
+(more formally, cardinality), which is annotated
 
+\[\mathbb{N} \cong \mathbb{N} \times \mathbb{N}.\]
 
-I will now present the proof of $\mathbb{N} \times ... \times
-\mathbb{N} \cong \mathbb{N}$ when the number of factors is greater
-than $2$, using some pairing function $e : \mathbb{N} \times
-\mathbb{N} \to \mathbb{N}$.  We will mimick the shape of this proof to
-write our single integer encoding of an arbitrary number of =enum=.
+Given the the imposibility of counting the number of elements of
+infinite sets using enumeration techniques, the existence of
+invertible functions (bijections) is used to determine if two sets are
+in a one-to-one correspondence (hence having the same "size").  The
+proof of $\mathbb{N} \cong \mathbb{N} \times \mathbb{N}$ is often
+immediately followed by a generalization where, for any finite number
+of factors $\mathbb{N} \times ... \times \mathbb{N} \cong \mathbb{N}$.
 
+I will now present a slightly informal overview of the proof of
+$\mathbb{N} \times ... \times \mathbb{N} \cong \mathbb{N}$ when the
+number of factors is greater than $2$ under the assumption that some
+pairing function $e : \mathbb{N} \times \mathbb{N} \to \mathbb{N}$
+exists --- which we now know it does from the previous chapter.  Along
+the proof I will construct the bijections (invertible functions) which
+are exactly the same ones to be used for the encoding of an arbitrary
+number of =enum= into a single integer in C++.
 
 First I will present the case for $3$ and $4$ factors to develop some
 intuition, later I will generalize to arbitrary number of factors
 since this is more similar to what we will write in code.
 
-
 If we have a pairing function $e : \mathbb{N} \times \mathbb{N} \to
-\mathbb{N}$, then we can construct a bijection $e' : \mathbb{N} \times
-\mathbb{N} \times \mathbb{N} \to \mathbb{N}$ by defining $e'$ to be
-$e'(x, y, z) := e(e(x, y), z)$. Since $e$ is invertible, if we denote
-the projection of the first and second element of a pair by $\pi_0$
-and $\pi_1$, respectively, we can define the inverse of $e'$ by
+\mathbb{N}$, then we can construct a bijection
 
-\[e'^{-1}(u) := (\pi_0(e^{-1}(\pi_0(e^{-1}(u)))), \pi_1(e^{-1}(\pi_0(e^{-1}(u)))), \pi_1(e^{-1}(u))).\]
+\[e' : \mathbb{N} \times \mathbb{N} \times \mathbb{N} \to \mathbb{N},\quad e'(x, y, z) := e(e(x, y), z).\]
 
-This seems like a mouthful but its mainly because of the notational
-noise intreduced by projections. The deconstruction is merely
-mimicking the shape of $e'$. Notice
+Since $e$ is invertible, we can define the inverse of $e'$ by
 
-\begin{align*}
-\pi_0(e^{-1}(u)) &= e(x, y),\\
-\pi_1(e^{-1}(u)) &= z,\\
-e^{-1}(\pi_0(e^{-1}(u))) &= (x, y),\\
-\pi_0(e^{-1}(\pi_0(e^{-1}(u)))) &= x,\\
-\pi_1(e^{-1}(\pi_0(e^{-1}(u)))) &= y\\
-\end{align*}
+\[e'^{-1} : \mathbb{N} \to \mathbb{N} \times \mathbb{N} \times \mathbb{N},\quad e'^{-1}(u) := (\pi_0(e^{-1}(\pi_0(e^{-1}(u)))), \pi_1(e^{-1}(\pi_0(e^{-1}(u)))), \pi_1(e^{-1}(u))).\]
 
-Using a function $c$ that appends an element to an $n$ tuple, yielding
-an $n+1$ tuple, then we can simplify to
+where
+
+\[\pi_0(x, y) := x \text{ and } \pi_1(x, y) := y.\]
+
+The definition of $e^{-1}$ seems like a mouthful but it is mainly
+because of the notational noise introduced by projections $\pi_i$. If
+we rewrite it using a function $c$ that appends an element to an $n$
+tuple, yielding an $n+1$ tuple, then we can simplify its definition to
 
 <<eq-1>>
 \begin{equation}
   e'^{-1}(u) := c(e^{-1}(\pi_0(e^{-1}(u))), \pi_1(e^{-1}(u))).
 \end{equation}
 
-Now for $4$ factors we want to construct a bijection $e'' : \mathbb{N}
-\times \mathbb{N} \times \mathbb{N} \times \mathbb{N} \to \mathbb{N}$
-from the pairing function $e$.  This could be defined as $e''(w, x, y,
-z) := e(e'(w, x, y), z) = e(e(e(w, x), y), z)$.  At this point we can
-already begin to see an [[https://wiki.haskell.org/index.php?title=Fold][accumulating or folding]] pattern emerging.
-
-The inverse $e''^{-1}$ is just
+Similarly, we could rewrite the definition of $e'$ using the inverse
+of $c$, $c^{-1}, that takes an $n$ tuple and yields a pair whose first
+component is the $n-1$ tuple consisting of the projections of the
+first $n-1$ components of the input tuple, and whose second component
+is the projection of the last component of the input tuple.  Then
 
 <<eq-2>>
 \begin{equation}
-e''^{-1}(u) := c(e'^{-1}(\pi_0(e^{-1}(u))), \pi_1(e^{-1}(u))).
+  e'(x, y, z) := e(e(\pi_0(c^{-1}(x, y, z))), \pi_1(c^{-1}(x, y, z))).
 \end{equation}
 
-Inspecting [[eq-1][Equation 1]] and [[eq-2][Equation 2]] we can notice that not only is
-the structural similarity of $e''^{-1}$ with the definiton of $e''$ as
-clear as that of $e'^{-1}$ with $e'$, but it is actually the same.  In
-the definiton of both inverses the innermost usage of $e$ corresponds
-to a destructuring of an encoding into the parts which it encodes, and
-the outermost usage of the inverse with one less prime ($'$) is the
-inductive step.
+It is now simpler to see the structural duality between $e'$ and its
+inverse $e^{-1}$.  While $e'$ in [[eq-2][Equation 2]] first destructs the input
+tuple with $c^{-1}$ and then encodes it via applications of $e$,
+$e^{-1}$ first decodes using $e^{-1}$ and then constructs a larger
+tuple using $c$.  Having found such a bijection between $\mathbb{N}
+\times \mathbb{N} \times \mathbb{N}$ and $\mathbb{N}$, we have
+finished the proof for the $3$ factor case.
 
-Thus we procede to write the variadic case as
 
+Moving onto the proof for $4$ factors we want to construct a bijection $e'' : \mathbb{N}
+\times \mathbb{N} \times \mathbb{N} \times \mathbb{N} \to \mathbb{N}$
+from the pairing function $e$.  This could be defined as
 
 <<eq-3>>
+\begin{align}
+e''(w, x, y,z) &:= e(e(e(w, x), y), z)\\
+&= e(e'(w, x, y), z) \notag \\
+&= e(e'(\pi_0(c^{-1}(w,x,y,z))), \pi_1(c^{-1}(w,x,y,z))). \notag
+\end{align}
+
+The first expression in the definition seems to be the emergence of an
+[[https://wiki.haskell.org/index.php?title=Fold][accumulating or folding]] pattern.  The last two equalities relate $e''$
+with its "inductive step" $e'$.  It is evident from putting the last
+equality of [[eq-3][Equation 3]] side to side with [[eq-2][Equation 2]] that the common
+pattern is that of using $c^{-1}$ to destruct the input tuple,
+followed by invoking the inductive step on the first component of the
+destructuring, followed by one final encoding via an outer invocation
+of $e$.
+
+The inverse of $e''$ is
+
+<<eq-4>>
 \begin{equation}
- e^{n}(x) :=
+e''^{-1}(u) := c(e'^{-1}(\pi_0(e^{-1}(u))), \pi_1(e^{-1}(u))),
+\end{equation}
+
+and putting equations [[eq-2][Equation 4]] and [[eq-1][Equation 1]] side by side also
+reveals structural similarities between the functions they define.
+
+With these structural observations taken into account, we procede to
+write the variadic cases
+
+<<eq-5>>
+\begin{equation}
+ e^{n}(x_1, ..., x_n) :=
    \begin{cases}
-    x &\text{if } n = 1\\
-    e(e^{n-1}(\pi_{0}(x), ..., \pi_{n-1}(x)), \pi_{n}(x)) &\text{otherwise}
-  \end{cases}.
+    x_1 &\text{if } n = 1\\
+    e(e^{n-1}(\pi_{0}(c^{-1}(x_1, ..., x_n))), \pi_{1}(c^{-1}(x_1, ..., x_n))) &\text{otherwise}
+  \end{cases},
 \end{equation}
 
 and its inverse
 
-<<eq-4>>
+<<eq-6>>
 \begin{equation}
  e^{-n}(x) :=
    \begin{cases}
