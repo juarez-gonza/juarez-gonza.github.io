@@ -282,6 +282,8 @@ Szudzik pairing formula reads
 
 and this is how it looks implemented in C++
 
+#+CAPTION: Szudzik pairing
+#+NAME: listing:binary-pairing
 #+include: ./code/basic.cpp src c++ :lines "126-130"
 
 Note. =unsigned_arithmetic_result_t= is similar to
@@ -305,6 +307,8 @@ The inverse of the Szudzik pairing is given by
 
 which is implemented by
 
+#+CAPTION: Szudzik unpairing
+#+NAME: listing:binary-unpairing
 #+include: ./code/basic.cpp src c++ :lines "136-164"
 
 Here we had to implement our own =unsigned integral= approximation of
@@ -347,7 +351,7 @@ First, I will present the case for $3$ and $4$ factors to develop some
 intuition.  Later, I will generalize to arbitrary number of factors.
 
 If we have a pairing function $e : \mathbb{N} \times \mathbb{N} \to
-\mathbb{N}$, then we can construct a bijection
+\mathbb{N}$, then we can construct a function
 
 \[e' : \mathbb{N} \times \mathbb{N} \times \mathbb{N} \to \mathbb{N},\quad e'(x, y, z) := e(e(x, y), z).\]
 
@@ -454,5 +458,44 @@ and its inverse
   \end{cases}.
 \end{equation}
 
+
+Using =sudzik_pair= from [[listing:binary-pairing][Listing 2]] in place of $e$, implementing the
+variadic version is not very complicated.  We achieve this by adding
+two new overloads to =szudzik_pair=, as shown below.
+
+#+CAPTION: Variadic Szudzik pairing
+#+NAME: listing:variadic-pair
+#+include: ./code/variadic.cpp src c++ :lines "130-141"
+
+The inverse requires some extra work.  First, we need to use some
+metaprogramming to recover the list of encoded types in the exact
+order they were encoded.  Second, we want to provide an API that does
+not require the user to wrap the variadic arguments into a type list.
+For the latter purpose, we rename =sudzik_unpair= function from
+[[listing:binary-unpairing][Listing 3]] into =sudzik_unpair__=, and use =szudzik_pair= to name a
+convenience function that wraps its template arguments in a type list
+before invoking the actual inversion logic.
+
+#+CAPTION: Variadic Szudzik unpairing
+#+NAME: listing:variadic-unpair
+#+include: ./code/variadic.cpp src c++ :lines "180-211"
+
+In the listing above, =tup= is a literal type otherwise similar
+=std::tuple=. The =operator+= is tuple concatenation.  The projection
+of the =i= component of an object =t= of type =tup= is computed by
+=p<i>(t)=.
+
+
+At last, we can implement a variadic =dispatch_enum= using a similar
+approach to that of the binary case ([[listing:basic-solution][Listing 1]]).  The main difference
+being an extra step, performed before any other step, that creates a
+type list out of the =enum= types --- this simplifies metaprogramming
+with Boost.Mp11.
+
+#+CAPTION: Variadic solution
+#+NAME: listing:basic-solution
+#+include: ./code/variadic.cpp src c++ :lines "244-282"
+
+The complete solution is available in [[https://godbolt.org/z/eGneqr6jP][Compiler Explorer]].
 
 * Conclusion

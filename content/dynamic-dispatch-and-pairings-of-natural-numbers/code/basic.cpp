@@ -144,14 +144,14 @@ constexpr T isqrt(T x) {
 template <std::unsigned_integral T, std::unsigned_integral S,
           std::same_as<unsigned_arithmetic_result_t<T, S>> I>
 constexpr std::pair<T, S> szudzik_unpair(I x) {
-    // cannot use variables for common subexpressions due to constexpr
+    // Cannot use variables for common subexpressions due to constexpr
     // constraints:
     //
     // q = isqrt(x)
     // l = x - isqrt(x) * isqrt(x)
 
     // Casts shouldn't cause a narrowing issue here, as we have
-    // already checked I == unsigned_arithmetic_result_t<T, S> and we
+    // already checked I == unsigned_arithmetic_result_t<T, S>. Moreover, we
     // know the values come from a szudzik_pair function so the
     // decomposition lies in the correct range of values for T and S
     return (x - isqrt(x) * isqrt(x)) < isqrt(x)

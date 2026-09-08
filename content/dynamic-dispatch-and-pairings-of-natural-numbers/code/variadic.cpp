@@ -160,14 +160,14 @@ constexpr I isqrt(I x) {
 template <std::unsigned_integral T, std::unsigned_integral S,
           std::same_as<unsigned_arithmetic_result_t<T, S>> I>
 constexpr tup<T, S> szudzik_unpair__(I x) {
-    // cannot use variables for common subexpressions due to constexpr
+    // Cannot use variables for common subexpressions due to constexpr
     // constraints:
     //
     // q = isqrt(x)
     // l = x - isqrt(x) * isqrt(x)
 
     // Casts shouldn't cause a narrowing issue here, as we have
-    // already checked I == unsigned_arithmetic_result_t<T, S> and we
+    // already checked I == unsigned_arithmetic_result_t<T, S>. Moreover we
     // know the values come from a szudzik_pair function so the
     // decomposition lies in the correct range of values for T and S
     return (x - isqrt(x) * isqrt(x)) < isqrt(x)
@@ -182,7 +182,6 @@ constexpr T szudzik_unpair__(T i) {
     return i;
 }
 
-template <typename ts>
 constexpr auto szudzik_unpair_(std::unsigned_integral auto x) {
     constexpr auto N = boost::mp11::mp_size<ts>::value;
     static_assert(N > 0);
@@ -190,27 +189,11 @@ constexpr auto szudzik_unpair_(std::unsigned_integral auto x) {
     using fully_decoded = boost::mp11::mp_back<ts>;
     if constexpr (N == 1) {
         return tup<fully_decoded>{szudzik_unpair__<fully_decoded>(x)};
-    } else if constexpr (N == 2) {
-        // This case is needed only to ensure overflow safety. Because it is
-        // possible for
-        //
-        // - fully_decoded == also_fully_decoded, yet
-        //
-        // - fully_decoded != decltype(x), where
-        //
-        // - decltype(x) == unsigned_arithmetic_result_t<fully_decoded,
-        // also_fully_decoded>
-        //
-        // If we have solely the unary base case, then we drop information
-        // to know if fully_decoded != decltype(x) because we screwed up
-        // somewhere or if it is a safe conversion (within the range of the
-        // destination type)
-        using also_fully_decoded = boost::mp11::mp_front<ts>;
-        return szudzik_unpair__<also_fully_decoded, fully_decoded>(x);
     } else /* constexpr */ {
         using ts_tail = boost::mp11::mp_pop_back<ts>;
         using decoded_unsigned_arithmetic_result_t =
-            boost::mp11::mp_fold<ts_tail, boost::mp11::mp_back<ts_tail>,
+            boost::mp11::mp_fold<boost::mp11::mp_pop_back<ts_tail>,
+                                 boost::mp11::mp_back<ts_tail>,
                                  unsigned_arithmetic_result_t>;
         return szudzik_unpair_<ts_tail>(
                    p<0>(szudzik_unpair__<decoded_unsigned_arithmetic_result_t,
@@ -298,7 +281,6 @@ constexpr auto dispatch_enum(F&& f, Enums... enums)
         });
 }
 
-#include <format>
 #include <iostream>
 #include <stdexcept>
 
