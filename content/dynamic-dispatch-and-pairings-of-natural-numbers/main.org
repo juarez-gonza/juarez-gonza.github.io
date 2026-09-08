@@ -2,31 +2,32 @@
 #+title: State machines, dynamic multi-dispatch, and pairings of natural numbers
 
 Recently at work I had to write a finite state machine in C++20.  A
- state machine evolves over time by changing its internal state each
- time it is fed some input. Having to execute logic based on /both/
- the current state and the input being fed implies implementations
- must use some kind of /dynamic multi-dispatch/ technique.
+state machine evolves over time by changing its internal state each
+time it is fed some input. Having to execute logic based on /both/ the
+current state and the input being fed implies that implementations
+must use some kind of /dynamic multi-dispatch/ technique.
 
 
 In C++ there are well-known approaches to implement state machines
 using [[https://khuttun.github.io/2017/02/04/implementing-state-machines-with-std-variant.html][=std::variant= and =std::visit=]].  It is also possible to
 implement state machines with inheritance-based dynamic polymorphism
-using something like the [[https://www.spigotmc.org/threads/implementing-finite-state-machines-with-visitor-design-pattern.336273/][visitor pattern]].  My problem was that due to
-circumstances of life and past decisions (of my authoring) the
-dispatch mechanism I had to implement was not based on types, but
-based on =enum= values.
+using something like the [[https://www.spigotmc.org/threads/implementing-finite-state-machines-with-visitor-design-pattern.336273/][visitor pattern]].  Due to circumstances of
+life and past decisions (of my authoring) the dispatch mechanism I had
+to implement was not based on types, but based on =enum= values.  This
+rendered the former two mechanisms unsuitable for my use-case.
 
 
-I solved this problem using some maths and metaprogramming which I
-will present throughout this post. After presenting the solution for
-the binary case, I will also present its full generalization to
-dynamic dispatch based on an arbitrary number of =enum=.
+The solution I will present for this problem makes use of some maths
+and metaprogramming. After presenting the solution for the binary case
+(sufficient for implementing a state machine), I will present its full
+generalization to dynamic dispatch based on an arbitrary number of
+=enum= values.
 
 
 * Problem setup
 
 In order to have something concrete in mind, we will use the finite
-state machine (FSM) described by the transition table below
+state machine (FSM) described by the transition table below.
 
 | State\Event   | a | b | c |
 |---------------+---+---+---|
@@ -35,12 +36,12 @@ state machine (FSM) described by the transition table below
 | C             | C | B | D |
 | D (final)     | - | - | - |
 
-where '-' is used to indicate that there are no transitions from the
-=(state, input)= pair of the given row and column.  Reaching such
+A dash ('-') is used to indicate that there are no transitions from
+the =(state, input)= pair of the given row and column.  Reaching such
 transitions is considered an error.  Alternatively, we could make an
 error state and have several final states.  Representing errors in one
 way or the other would not affect our multi-dispatch solution, so we
-wont be wasting any more time in the finer details of the FSM
+will not be wasting any more time on the finer details of the FSM
 construction.
 
 The =enum= types for this state machine are defined as follows
@@ -48,7 +49,7 @@ The =enum= types for this state machine are defined as follows
 #+include: ./code/basic.cpp src c++ :lines "281-283"
 
 A naive solution can make use of nested conditionals to choose a
-behavior based on the value of state and input:
+behavior based on the values of state and input:
 
 #+include: ./code/bad_switch_opt.cpp src c++ :lines "20-68"
 
@@ -62,12 +63,12 @@ But this has a couple potential issues:
    burden if there is not a consistently good habit to not entwine
    dispatch and business logic.
 
-2. **Suboptimal?** Maybe. Being honest, I have not played with
+2. **Suboptimal?** Maybe. In all honesty, I have not played with
    (profiled) =switch= optimizations as much as [[https://xoranth.net/verb-parse/][other people have]]. But
    in this post I experiment with branching based on a single value
-   that encodes =state= and =input= instead of sequentially branching
+   that encodes =state= and =input=, instead of sequentially branching
    based on individual =enum= values.  Additionally, it would be nice
-   for these encoded values to be densely distributed, as this
+   for these encoded values to be densely distributed since this
    encourages the compiler to [[https://youtu.be/gMqSinyL8uk][lower the =switch=]] to a compactly
    represented /jump table/.
 
