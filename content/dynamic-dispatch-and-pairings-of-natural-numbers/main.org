@@ -176,7 +176,6 @@ just described can be written as follows
 #+CAPTION: Basic solution with missing encoding function
 #+include: ./code/demo_basic.cpp src c++ :lines "1-44"
 
-
 * Completing the solution: encoding pairs
 
 In order to fill the missing blanks in [[listing:basic-solution][Listing 1]] , we need to define
@@ -503,3 +502,8 @@ with Boost.Mp11.
 The complete solution is available in [[https://godbolt.org/z/eGneqr6jP][Compiler Explorer]].
 
 * Conclusion
+
+Should this have a conclusion?  This was just me showing off something
+I think is cool.  Using math tricks to solve problems is always cool.
+People claiming that math is not needed for programming do not know
+what they are missing.
