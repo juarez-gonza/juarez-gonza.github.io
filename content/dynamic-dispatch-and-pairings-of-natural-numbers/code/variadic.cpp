@@ -263,7 +263,7 @@ constexpr auto dispatch_enum(F&& f, Enums... enums)
     encoded_type encoded =
         szudzik_pair(static_cast<std::underlying_type_t<Enums>>(enums)...);
 
-    // Here `encoded` may have been turned into an int due to common_type and
+    // Here `encoded` may have been turned into an int due to unsigned_arithmetic_t.
     // -Wsign-conversion will yell because mp_with_index converts to
     // std::size_t. But we know we are operating with unsigned numbers (problem
     // restriction)

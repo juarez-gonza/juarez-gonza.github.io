@@ -495,9 +495,9 @@ being an extra step, performed before any other step, that creates a
 type list out of the =enum= types --- this simplifies metaprogramming
 with Boost.Mp11.
 
-#+NAME: listing:basic-solution
+#+NAME: listing:variadic-solution
 #+CAPTION: Variadic solution
-#+include: ./code/variadic.cpp src c++ :lines "244-282"
+#+include: ./code/variadic.cpp src c++ :lines "244-283"
 
 The complete solution is available in [[https://godbolt.org/z/eGneqr6jP][Compiler Explorer]].
 
