@@ -172,8 +172,8 @@ the maths explained in the next chapter comes in.  Leaving the
 definition of the encoding function in suspense for now, the algorithm
 just described can be written as follows
 
-#+CAPTION: Basic solution with missing encoding function
 #+NAME: listing:basic-solution
+#+CAPTION: Basic solution with missing encoding function
 #+include: ./code/demo_basic.cpp src c++ :lines "1-44"
 
 
@@ -231,8 +231,9 @@ functions]].  I considered the following:
 - The [[https://en.wikipedia.org/wiki/Pairing_function#Cantor_pairing_function][Cantor pairing function]] can be visualized in the a 2D graph as a
   walk through the diagonals of the graph.
 
-  #+CAPTION: Cantor pairing function (image from [[https://drhagen.com/blog/superior-pairing-function/][drhagen's blog]])
   #+NAME: fig:cantor_pairing
+  #+CAPTION: Cantor pairing function (image from [[https://drhagen.com/blog/superior-pairing-function/][drhagen's blog]])
+  #+ATTR_HTML: :style width:80%
   [[file:img/cantor_pairing_light.svg]]
 
   Hopefully it is clear from the picture that the gap between
@@ -243,8 +244,9 @@ functions]].  I considered the following:
   encodings of all pairs in the set $S := \{(x, y) \in \mathbb{N} : x,
   y \lt 20\}$.
 
+  #+NAME: fig:cantor-20-20  
   #+CAPTION: Distribution of range of Cantor pairing
-  #+NAME: fig:cantor-20-20
+  #+ATTR_HTML: :style width:80%
   [[file:img/cantor-20-20.png]]
 
   Even though we are only plotting the first $400$ values (in the
@@ -257,8 +259,9 @@ functions]].  I considered the following:
   visualized as a walk through a graph.  In this case the walk can be
   seen as tracing the perimeter of increasingly larger squares.
 
-  #+CAPTION: Szudzik pairing function (image from [[https://drhagen.com/blog/superior-pairing-function/][drhagen's blog]])
   #+NAME: fig:cantor_pairing
+  #+CAPTION: Szudzik pairing function (image from [[https://drhagen.com/blog/superior-pairing-function/][drhagen's blog]])
+  #+ATTR_HTML: :style width:80%
   [[file:img/szudzik_pairing_light.svg]]
 
   The approach of Szudzik achieves a very dense, uniformly distributed
@@ -266,8 +269,9 @@ functions]].  I considered the following:
   shows the distribution of the image of the set $S$ (used for [[fig:cantor-20-20][Figure
   2]]) under Szudzik pairing function.
 
-  #+CAPTION: Distribution of range of Szudzik pairing
   #+NAME: fig:szudzik-20-20  
+  #+CAPTION: Distribution of range of Szudzik pairing
+  #+ATTR_HTML: :style width:80%
   [[file:img/szudzik-20-20.png]]  
 
 Szudzik pairing formula reads
@@ -282,8 +286,8 @@ Szudzik pairing formula reads
 
 and this is how it looks implemented in C++
 
-#+CAPTION: Szudzik pairing
 #+NAME: listing:binary-pairing
+#+CAPTION: Szudzik pairing
 #+include: ./code/basic.cpp src c++ :lines "126-130"
 
 Note. =unsigned_arithmetic_result_t= is similar to
@@ -307,8 +311,8 @@ The inverse of the Szudzik pairing is given by
 
 which is implemented by
 
-#+CAPTION: Szudzik unpairing
 #+NAME: listing:binary-unpairing
+#+CAPTION: Szudzik unpairing
 #+include: ./code/basic.cpp src c++ :lines "136-164"
 
 Here we had to implement our own =unsigned integral= approximation of
@@ -463,8 +467,8 @@ Using =sudzik_pair= from [[listing:binary-pairing][Listing 2]] in place of $e$, 
 variadic version is not very complicated.  We achieve this by adding
 two new overloads to =szudzik_pair=, as shown below.
 
-#+CAPTION: Variadic Szudzik pairing
 #+NAME: listing:variadic-pair
+#+CAPTION: Variadic Szudzik pairing
 #+include: ./code/variadic.cpp src c++ :lines "130-141"
 
 The inverse requires some extra work.  First, we need to use some
@@ -476,8 +480,8 @@ For the latter purpose, we rename =sudzik_unpair= function from
 convenience function that wraps its template arguments in a type list
 before invoking the actual inversion logic.
 
-#+CAPTION: Variadic Szudzik unpairing
 #+NAME: listing:variadic-unpair
+#+CAPTION: Variadic Szudzik unpairing
 #+include: ./code/variadic.cpp src c++ :lines "180-211"
 
 In the listing above, =tup= is a literal type otherwise similar
@@ -492,8 +496,8 @@ being an extra step, performed before any other step, that creates a
 type list out of the =enum= types --- this simplifies metaprogramming
 with Boost.Mp11.
 
-#+CAPTION: Variadic solution
 #+NAME: listing:basic-solution
+#+CAPTION: Variadic solution
 #+include: ./code/variadic.cpp src c++ :lines "244-282"
 
 The complete solution is available in [[https://godbolt.org/z/eGneqr6jP][Compiler Explorer]].
