@@ -76,18 +76,17 @@ But this has a couple potential issues:
 * An incomplete solution
 
 We begin designing the solution by specifying the signature of the
-function that performs dynamic dispatch over =enum= values and showing
-one possible way to use this function to implement the FSM of the
-previous section.
+function that performs dynamic dispatch over =enum= values, and
+showing one possible way to use this function to implement the FSM of
+the previous section.
 
 The signature of the dispatching function is
 
 #+include: ./code/basic.cpp src c++ :lines "203-207"
 
-where =F= is the type of an function invocable with an =enum_values=
-type tag that lifts the values enumerated by =StateT= and =InputT=
-(basically a type alias to =std::integral_constant=).  The return type
-is whatever =f= returns.
+Note. The =enum_values= tag lifts the values enumerated by =StateT=
+and =InputT= into types --- basically a type alias to
+=std::integral_constant= of a tuple-like type.
 
 The previously described FSM can be implemented using =dispatch_enum=
 in the following manner:
@@ -100,9 +99,8 @@ function.
 #+include: ./code/basic.cpp src c++ :lines "354-359"
 
 From both the signature of =dispatch_enum= and its expected usage we
-can come up with a rough plan to achieve what we want.  We will divide
-the algorithm into the part which must take place at compile time, and
-that which must take place at runtime:
+can come up with a rough plan to implement =dispatch_enum=.  We will
+divide the algorithm into two parts: compile time and runtime work.
 
 1. At compile time
 
@@ -134,8 +132,9 @@ that which must take place at runtime:
       discriminant =d= is known at compile time, use the inverse of
       the encoding function =e= and the inverse of =u= to obtain
       compile time values =(state, input)= such that =e(u(state),
-      u(input)) = d=, and invoke the argument function =f= using
-      =enum_values= tags constructed from =state= and =input=.
+      u(input)) = d=.  Immediately after, invoke the argument function
+      =f= using an =enum_values= tag constructed from =state= and
+      =input=.
 
       Note. The inverses of =e= and =u= exist because of the "unique"
       and "distinct" requirements in their defining wordings (at steps
@@ -154,13 +153,13 @@ The enumeration of values enumerated by an =enum= in [[step-1-1][step 1.1]] can 
 obtained in a variety of ways.  I chose to use the
 =magic_enum::enum_values= function from the infamous [[https://github.com/Neargye/magic_enum/tree/master][magic_enum]]
 library, as I found that to provide the cleanest API in the pre
-reflection era (recall I'm using C++20).
+reflection era (recall the solution is constrained to C++20).
 
 
 The function =u= of [[step-1-2][step 1.2]] can be a =static_cast= from an =enum= to
-its =std::underlying_type_t=.  Its inverse, required for [[step-1-6][step 1.6]] is
-the construction of an =enum= from a value of its underlying type ---
-possible via brace-initialization since C++17, see [[https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0138r2.pdf][P0138]].
+its =std::underlying_type_t=.  Its inverse, which is required for [[step-1-6][step
+1.6]], is the construction of an =enum= from a value of its underlying
+type --- possible via brace-initialization since C++17, see [[https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0138r2.pdf][P0138]].
 
 
 For the metaprogramming required to do most of the compile time work
@@ -168,10 +167,10 @@ as well as for the generation of the dispatching logic from a single
 encoding value, I chose to use the metaprogramming library [[https://www.boost.org/doc/libs/latest/libs/mp11/doc/html/mp11.html][Boost.Mp11]].
 
 
-The only remaining blank is the encoding function =e=, which is where
-the maths explained in the next chapter comes in.  Leaving that in
-suspense for now, the algorithm just described can be written as
-follows
+The only remaining blank is the encoding function =e=.  Here is where
+the maths explained in the next chapter comes in.  Leaving the
+definition of the encoding function in suspense for now, the algorithm
+just described can be written as follows
 
 #+include: ./code/demo_basic.cpp src c++ :lines "1-44"
 
