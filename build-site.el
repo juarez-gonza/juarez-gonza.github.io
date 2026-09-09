@@ -12,30 +12,48 @@
 
 ;; Install dependencies
 (package-install 'htmlize)
+;; (package-install 'org-special-block-extras)
 
-;; Load the publishing system
+;; Load the publishing system and other packages
 (require 'ox-publish)
+;; (require 'org-special-block-extras)
 
 ;; Customize the HTML output
 (setq org-html-validation-link nil            ;; Don't show validation link
-      org-html-head-include-scripts nil       ;; Use our own scripts
-      org-html-head-include-default-style nil ;; Use our own styles
-      org-html-head "<link rel=\"stylesheet\" href=\"https://cdn.simplecss.org/simple.min.css\" />"
-      org-export-with-sub-superscripts '{})
+      org-html-head-include-scripts nil       ;; Disable org's html default JS
+      org-html-head-include-default-style nil ;; Disable org's html default CSS
+      ;; style: simple css
+      ;; org-html-head "<link rel=\"stylesheet\" href=\"https://cdn.simplecss.org/simple.min.css\" />"
+      ;; style: gongzhitaao https://github.com/gongzhitaao/orgcss
+      org-html-htmlize-output-type 'css ;; needed for gongzhitaao code highlighting
+      org-html-head "<link rel=\"stylesheet\" type=\"text/css\" href=\"https://gongzhitaao.org/orgcss/org.css\" />")
 
 ;; Define the publishing project
 (setq org-publish-project-alist
       (list
+       ;; Blog posts
        (list "org-site:main"
              :recursive t
              :base-directory "./content"
              :publishing-function 'org-html-publish-to-html
              :publishing-directory "./public"
-             :with-author nil ;; Don't include author name
-             :with-creator t ;; Include Emacs and Org versions in footer
-             :with-toc t     ;; Include a table of contents
-             :section-numbers nil    ;; Don't include section numbers
-             :time-stamp-file nil)))    ;; Don't include time stamp in file
+	     :base-extension "org"
+             :html-preamble (concat "<div class='topnav'>
+                                     <a href='/index.html'>Home</a>
+                                     </div>")
+             :with-author nil      ;; Don't include author name
+             :with-creator t       ;; Include Emacs and Org versions in footer
+             :with-toc t           ;; Include a table of contents
+             :section-numbers nil  ;; Don't include section numbers
+	     :time-stamp-file nil) ;; Don't include time stamp in file
+
+       ;; Images and other static files
+       (list "org-site:static"
+             :recursive t
+             :base-directory "./content"
+             :publishing-function 'org-publish-attachment
+             :publishing-directory "./public"
+             :base-extension "png\\|jpg\\|jpeg\\|gif\\|svg\\|webp")))
 
 ;; Generate the site output
 (org-publish-all t)

@@ -1,19 +1,32 @@
-#+title: Page fault making machine
+#+title: A bit
 
 * What is this?
 
-This is a work-in-progress blog where I intend to upload stuff I do not know
-where to communicate otherwise. Most (all?) of this stuff will be programming and/or
-math related.
+This is a work-in-progress blog for some programming and math stuff.
+I will upload things every now and then.
 
 * Who am I?
 
-I am a programmer (mostly C++) and I like math.
+I am Gonzalo Juarez.  I like some kinds of math and some kinds of
+programming.  Most of the programming I do is in C++, although I take
+heavy influences from other languages and programming paradigms.
+
+** Contact
+
+Reach out via [[mailto:gonzalojuarezte@gmail.com][email (gonzalojuarezte@gmail.com)]] or [[https:linkedin.com/in/gonzalo-juarez-tello-435bb5364][linkedin]] for any
+questions, corrections, discussions, or comments related to the blogs'
+contents.
 
 * Blog Index
 
 This should be populated some day...
 
-[[./empathising-with-c++20-coroutines/main.org][Empathising with C++20 coroutines]]
+[[file:dynamic-dispatch-and-pairings-of-natural-numbers/main.org][State machines, dynamic multi-dispatch, and pairings of natural numbers]]
 
-[[file:cps-and-senders-and-receivers/main.org][CPS and Senders & Receivers]]
+* Generative AI on this site
+
+All the words, code, math and their mistakes in this site are written
+by me.  Usage of generative AI is limited to some of the scripts used
+to draw plots --- sometimes I'm lazy.
+
+
