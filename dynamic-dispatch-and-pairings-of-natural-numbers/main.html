@@ -53,17 +53,17 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org9373594">Problem setup</a></li>
-<li><a href="#org49e710c">An incomplete solution</a></li>
-<li><a href="#org9f995bd">Completing the solution: encoding pairs</a></li>
-<li><a href="#orgb0441d4">Beyond the solution: going variadic</a></li>
-<li><a href="#org90101dc">Conclusion</a></li>
+<li><a href="#orgf68bb9b">Problem setup</a></li>
+<li><a href="#orgf8ce9be">An incomplete solution</a></li>
+<li><a href="#org8cb28e4">Completing the solution: encoding pairs</a></li>
+<li><a href="#org67aee1a">Beyond the solution: going variadic</a></li>
+<li><a href="#org5cb0617">Conclusion</a></li>
 </ul>
 </div>
 </div>
 <p>
-In this post I expose a function that performs function dispatch based
-on more than one <code>enum</code> value in C++.
+In this post I expose a higher order function that performs function
+dispatch based on more than one <code>enum</code> value in C++.
 </p>
 
 
@@ -74,10 +74,12 @@ state</i> and an <i>input symbol</i>.  This requires a mechanism to make a
 runtime decision based on more than one parameter, i.e., a
 <i>multi-dispatch</i> facility.  The language offers well-known approaches
 to do so when the decision is based on type-level information (via
-<a href="https://khuttun.github.io/2017/02/04/implementing-state-machines-with-std-variant.html"><code>std::variant</code> and <code>std::visit</code></a> or <a href="https://www.spigotmc.org/threads/implementing-finite-state-machines-with-visitor-design-pattern.336273/">the good old OOP visitor pattern</a>).
-When it comes to <code>enum</code> values, however, the language and the standard
-library provide nothing of higher level than <code>switch</code> statements and
-chaining of <code>if/else</code> statements.
+<a href="https://khuttun.github.io/2017/02/04/implementing-state-machines-with-std-variant.html"><code>std::variant</code> and <code>std::visit</code></a> or
+<a href="https://www.spigotmc.org/threads/implementing-finite-state-machines-with-visitor-design-pattern.336273/">the
+good old OOP visitor pattern</a>).  When it comes to <code>enum</code> values,
+however, the language and the standard library provide no constructs
+of higher level than <code>switch</code> statements and chaining of <code>if/else</code>
+statements.
 </p>
 
 
@@ -90,9 +92,9 @@ generalization to dynamic dispatch based on an arbitrary number of
 </p>
 
 
-<div id="outline-container-org9373594" class="outline-2">
-<h2 id="org9373594">Problem setup</h2>
-<div class="outline-text-2" id="text-org9373594">
+<div id="outline-container-orgf68bb9b" class="outline-2">
+<h2 id="orgf68bb9b">Problem setup</h2>
+<div class="outline-text-2" id="text-orgf68bb9b">
 <p>
 In order to have something concrete in mind, we will use the finite
 state machine (FSM) described by the transition table below.
@@ -251,9 +253,9 @@ compactly represented <i>jump table</i>.</li>
 </div>
 
 
-<div id="outline-container-org49e710c" class="outline-2">
-<h2 id="org49e710c">An incomplete solution</h2>
-<div class="outline-text-2" id="text-org49e710c">
+<div id="outline-container-orgf8ce9be" class="outline-2">
+<h2 id="orgf8ce9be">An incomplete solution</h2>
+<div class="outline-text-2" id="text-orgf8ce9be">
 <p>
 We begin designing the solution by specifying the signature of the
 function that performs dynamic dispatch over <code>enum</code> values, and
@@ -365,10 +367,10 @@ divide the algorithm into two parts: compile time and runtime work.
 <li>At compile time
 
 <ol class="org-ol">
-<li><a id="org900ce82"></a> List the values enumerated by <code>StateT</code> and
+<li><a id="orgecf9996"></a> List the values enumerated by <code>StateT</code> and
 <code>InputT</code>, denote them <code>states</code> and <code>inputs</code>, respectively.</li>
 
-<li><a id="org8b12752"></a> Map each value in <code>states</code> to a distinct
+<li><a id="org8d63eab"></a> Map each value in <code>states</code> to a distinct
 <code>integral</code>.  Do the same with <code>inputs</code> (one input and one state
 may share a mapping value).  Denote that mapping function by
 <code>u</code>.</li>
@@ -377,7 +379,7 @@ may share a mapping value).  Denote that mapping function by
 from the previous step.</li>
 
 <li><p>
-<a id="org7aa4c51"></a> Encode each pair in the cartesian product to a
+<a id="org65e1484"></a> Encode each pair in the cartesian product to a
 unique <code>integral</code> using an encoding function <code>e</code>.  Denote the
 resulting list by <code>encodings</code>.
 </p>
@@ -396,7 +398,7 @@ runtime value, using the values in <code>encodings</code> as the
 discriminants (values associated to <code>case</code> labels).</li>
 
 <li><p>
-<a id="org87f0ee6"></a> Inside each <code>case</code> block, where the associated
+<a id="orgc9f793b"></a> Inside each <code>case</code> block, where the associated
 discriminant <code>d</code> is known at compile time, use the inverse of
 the encoding function <code>e</code> and the inverse of <code>u</code> to obtain
 compile time values <code>(state, input)</code> such that <code>e(u(state),
@@ -408,7 +410,7 @@ compile time values <code>(state, input)</code> such that <code>e(u(state),
 <p>
 Note. The inverses of <code>e</code> and <code>u</code> exist because of the "unique"
 and "distinct" requirements in their defining wordings (at steps
-<a href="#org7aa4c51">1.4</a> and <a href="#org8b12752">1.2</a>, resp.).
+<a href="#org65e1484">1.4</a> and <a href="#org8d63eab">1.2</a>, resp.).
 </p></li>
 </ol></li>
 
@@ -425,7 +427,7 @@ is based.</li>
 
 
 <p>
-The enumeration of values enumerated by an <code>enum</code> in <a href="#org900ce82">step 1.1</a> can be
+The enumeration of values enumerated by an <code>enum</code> in <a href="#orgecf9996">step 1.1</a> can be
 obtained in a variety of ways.  I chose to use the
 <code>magic_enum::enum_values</code> function from the infamous <a href="https://github.com/Neargye/magic_enum/tree/master">magic<sub>enum</sub></a>
 library.  I think that library allows me to provide the cleanest API
@@ -435,8 +437,8 @@ C++20).
 
 
 <p>
-The function <code>u</code> of <a href="#org8b12752">step 1.2</a> can be a <code>static_cast</code> from an <code>enum</code> to
-its <code>std::underlying_type_t</code>.  Its inverse, which is required for <a href="#org87f0ee6">step
+The function <code>u</code> of <a href="#org8d63eab">step 1.2</a> can be a <code>static_cast</code> from an <code>enum</code> to
+its <code>std::underlying_type_t</code>.  Its inverse, which is required for <a href="#orgc9f793b">step
 1.6</a>, is the construction of an <code>enum</code> from a value of its underlying
 type &#x2014; possible via brace-initialization since C++17, see <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0138r2.pdf">P0138</a>.
 </p>
@@ -457,7 +459,7 @@ just described can be written as follows
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 1: </span>Basic solution with missing encoding function</label><pre class="src src-c++" id="orgdb9d7d3"><span class="org-keyword">template</span> &lt;<span class="org-keyword">typename</span> <span class="org-type">StateT</span>, <span class="org-keyword">typename</span> <span class="org-type">InputT</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 1: </span>Basic solution with missing encoding function</label><pre class="src src-c++" id="org8393a9a"><span class="org-keyword">template</span> &lt;<span class="org-keyword">typename</span> <span class="org-type">StateT</span>, <span class="org-keyword">typename</span> <span class="org-type">InputT</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
     <span class="org-keyword">requires</span> <span class="org-constant">std</span>::<span class="org-type">is_enum_v</span>&lt;<span class="org-type">StateT</span>&gt; <span class="org-keyword">and</span> <span class="org-constant">std</span>::<span class="org-type">is_enum_v</span>&lt;<span class="org-type">InputT</span>&gt;
 <span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> dispatch_enum(F&amp;&amp; f, <span class="org-type">StateT</span> <span class="org-variable-name">state</span>, InputT input)
     -&gt; <span class="org-keyword">decltype</span>(<span class="org-constant">std</span>::forward&lt;<span class="org-type">F</span>&gt;(<span class="org-type">f</span>)(enum_values&lt;StateT{}, InputT{}&gt;{})) {
@@ -505,11 +507,11 @@ just described can be written as follows
 </div>
 </div>
 
-<div id="outline-container-org9f995bd" class="outline-2">
-<h2 id="org9f995bd">Completing the solution: encoding pairs</h2>
-<div class="outline-text-2" id="text-org9f995bd">
+<div id="outline-container-org8cb28e4" class="outline-2">
+<h2 id="org8cb28e4">Completing the solution: encoding pairs</h2>
+<div class="outline-text-2" id="text-org8cb28e4">
 <p>
-In order to fill the missing blanks in <a href="#orgdb9d7d3">Listing 1</a> , we need to define
+In order to fill the missing blanks in <a href="#org8393a9a">Listing 1</a> , we need to define
 an encoding function, that is, an invertible function which maps two
 <code>integral</code> numbers into one <code>integral</code> value.  This task requires some
 math.  To simplify the problem, we will disregard negative values
@@ -586,7 +588,7 @@ walk through the diagonals of the graph.
 </p>
 
 
-<div id="org15da0f6" class="figure">
+<div id="orgf7250a0" class="figure">
 <p><img src="img/cantor_pairing_light.svg" alt="cantor_pairing_light.svg" class="org-svg" style="width:80%" />
 </p>
 <p><span class="figure-number">Figure 1: </span>Cantor pairing function (image from <a href="https://drhagen.com/blog/superior-pairing-function/">drhagen's blog</a>)</p>
@@ -603,7 +605,7 @@ encodings of all pairs in the set \(S := \{(x, y) \in \mathbb{N} : x,
 </p>
 
 
-<div id="org6a2365a" class="figure">
+<div id="orgce27bfa" class="figure">
 <p><img src="img/cantor-20-20.png" alt="cantor-20-20.png" style="width:80%" />
 </p>
 <p><span class="figure-number">Figure 2: </span>Distribution of range of Cantor pairing</p>
@@ -624,7 +626,7 @@ seen as tracing the perimeter of increasingly larger squares.
 </p>
 
 
-<div id="orgeca68fd" class="figure">
+<div id="org0164cab" class="figure">
 <p><img src="img/szudzik_pairing_light.svg" alt="szudzik_pairing_light.svg" class="org-svg" style="width:80%" />
 </p>
 <p><span class="figure-number">Figure 3: </span>Szudzik pairing function (image from <a href="https://drhagen.com/blog/superior-pairing-function/">drhagen's blog</a>)</p>
@@ -633,12 +635,12 @@ seen as tracing the perimeter of increasingly larger squares.
 <p>
 The approach of Szudzik achieves a very dense, uniformly distributed
 range, which makes it a good fit for our needs.  The picture below
-shows the distribution of the image of the set \(S\) (used for <a href="#org6a2365a">Figure
+shows the distribution of the image of the set \(S\) (used for <a href="#orgce27bfa">Figure
 2</a>) under Szudzik pairing function.
 </p>
 
 
-<div id="orge3debd3" class="figure">
+<div id="org84abfc6" class="figure">
 <p><img src="img/szudzik-20-20.png" alt="szudzik-20-20.png" style="width:80%" />  
 </p>
 <p><span class="figure-number">Figure 4: </span>Distribution of range of Szudzik pairing</p>
@@ -662,7 +664,7 @@ and this is how it looks implemented in C++
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 2: </span>Szudzik pairing</label><pre class="src src-c++" id="orgcddad52"><span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>, <span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">S</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 2: </span>Szudzik pairing</label><pre class="src src-c++" id="org15caa75"><span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>, <span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">S</span>&gt;
 <span class="org-keyword">constexpr</span> <span class="org-type">unsigned_arithmetic_result_t</span>&lt;<span class="org-type">T</span>, <span class="org-type">S</span>&gt; <span class="org-function-name">szudzik_pair</span>(<span class="org-type">T</span> <span class="org-variable-name">x</span>, <span class="org-type">S</span> <span class="org-variable-name">y</span>) {
     <span class="org-keyword">return</span> y &gt; x ? x + y * y : x * x + x + y;
 }
@@ -697,7 +699,7 @@ which is implemented by
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 3: </span>Szudzik unpairing</label><pre class="src src-c++" id="org92dd23a"><span class="org-comment-delimiter">// </span><span class="org-comment">need for constexpr
+<label class="org-src-name"><span class="listing-number">Listing 3: </span>Szudzik unpairing</label><pre class="src src-c++" id="org37f747f"><span class="org-comment-delimiter">// </span><span class="org-comment">need for constexpr
 </span><span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>&gt;
 <span class="org-keyword">constexpr</span> <span class="org-type">T</span> <span class="org-function-name">isqrt</span>(<span class="org-type">T</span> <span class="org-variable-name">x</span>) {
     <span class="org-type">T</span> <span class="org-variable-name">out</span>{};
@@ -743,9 +745,9 @@ link.
 </div>
 </div>
 
-<div id="outline-container-orgb0441d4" class="outline-2">
-<h2 id="orgb0441d4">Beyond the solution: going variadic</h2>
-<div class="outline-text-2" id="text-orgb0441d4">
+<div id="outline-container-org67aee1a" class="outline-2">
+<h2 id="org67aee1a">Beyond the solution: going variadic</h2>
+<div class="outline-text-2" id="text-org67aee1a">
 <p>
 Given the impossibility of counting the number of elements of infinite
 sets using enumeration techniques, the existence of an invertible
@@ -827,7 +829,7 @@ we can simplify its definition to
 </p>
 
 <p>
-<a id="org1653d7a"></a>
+<a id="org524b29d"></a>
 </p>
 \begin{equation}
   e'^{-1}(u) := c(e^{-1}(\pi_0(e^{-1}(u))), \pi_1(e^{-1}(u))).
@@ -844,7 +846,7 @@ the input \(n\) tuple.  Now the definition of \(e'\) can be rewritten as
 </p>
 
 <p>
-<a id="orgb2eb9e4"></a>
+<a id="orga353c49"></a>
 </p>
 \begin{equation}
   e'(x, y, z) := e(e(\pi_0(c^{-1}(x, y, z))), \pi_1(c^{-1}(x, y, z))).
@@ -852,9 +854,9 @@ the input \(n\) tuple.  Now the definition of \(e'\) can be rewritten as
 
 <p>
 Now it is clearer to see the structural similarity between \(e'\) and
-its inverse \(e^{-1}\). In <a href="#orgb2eb9e4">Equation 2</a>, \(e'\) first destructs the input
+its inverse \(e^{-1}\). In <a href="#orga353c49">Equation 2</a>, \(e'\) first destructs the input
 tuple into smaller parts (via \(c^{-1}\)), then encodes (via \(e\)).  In
-<a href="#org1653d7a">Equation 1</a> , \(e'^{-1}\) first decodes (via \(e^{-1}\)), then constructs a
+<a href="#org524b29d">Equation 1</a> , \(e'^{-1}\) first decodes (via \(e^{-1}\)), then constructs a
 larger output tuple (via \(c\)).  We will now proceed to the case for
 \(4\) factors and see if the same patterns emerge.
 </p>
@@ -867,7 +869,7 @@ constructed as follows
 </p>
 
 <p>
-<a id="org84c6f98"></a>
+<a id="org3f21562"></a>
 </p>
 \begin{align}
 e''(w, x, y,z) &:= e(e(e(w, x), y), z)\\
@@ -876,15 +878,15 @@ e''(w, x, y,z) &:= e(e(e(w, x), y), z)\\
 \end{align}
 
 <p>
-The first expression in <a href="#org84c6f98">Equation 3</a> seems to be the emergence of an
+The first expression in <a href="#org3f21562">Equation 3</a> seems to be the emergence of an
 <a href="https://wiki.haskell.org/index.php?title=Fold">accumulating or folding</a> pattern.  The last two equalities relate \(e''\)
 with the function \(e'\) just developed.
 </p>
 
 
 <p>
-It is evident, from putting the last equality of <a href="#org84c6f98">Equation 3</a> side by
-side with <a href="#orgb2eb9e4">Equation 2</a>, that the common pattern is that of (1) destruct
+It is evident, from putting the last equality of <a href="#org3f21562">Equation 3</a> side by
+side with <a href="#orga353c49">Equation 2</a>, that the common pattern is that of (1) destruct
 the input tuple via \(c^{-1}\); (2) encode a smaller number of elements
 via an encoding function that works for \(n-1\), where \(n\) is the number
 of components in the input tuple; and (3) use one final encoding via
@@ -896,14 +898,14 @@ The inverse of \(e''\) is
 </p>
 
 <p>
-<a id="orgfb1ac10"></a>
+<a id="orgc4d89ef"></a>
 </p>
 \begin{equation}
 e''^{-1}(u) := c(e'^{-1}(\pi_0(e^{-1}(u))), \pi_1(e^{-1}(u))).
 \end{equation}
 
 <p>
-Putting <a href="#orgb2eb9e4">Equation 4</a> and <a href="#org1653d7a">Equation 1</a> side by side reveals they are,
+Putting <a href="#orga353c49">Equation 4</a> and <a href="#org524b29d">Equation 1</a> side by side reveals they are,
 actually, quite similar too.
 </p>
 
@@ -914,7 +916,7 @@ write the variadic cases:
 </p>
 
 <p>
-<a id="org7954f81"></a>
+<a id="orgb69a82f"></a>
 </p>
 \begin{equation}
  e^{n}(x_1, ..., x_n) :=
@@ -929,7 +931,7 @@ and its inverse
 </p>
 
 <p>
-<a id="org812b715"></a>
+<a id="org543190c"></a>
 </p>
 \begin{equation}
  e^{-n}(u) :=
@@ -941,13 +943,13 @@ and its inverse
 
 
 <p>
-Using <code>sudzik_pair</code> from <a href="#orgcddad52">Listing 2</a> in place of \(e\), implementing the
+Using <code>sudzik_pair</code> from <a href="#org15caa75">Listing 2</a> in place of \(e\), implementing the
 variadic version is not very complicated.  We achieve this by adding
 two new overloads to <code>szudzik_pair</code>, as shown below.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 4: </span>Variadic Szudzik pairing</label><pre class="src src-c++" id="org0833930"><span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 4: </span>Variadic Szudzik pairing</label><pre class="src src-c++" id="orgb42a959"><span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>&gt;
 <span class="org-keyword">constexpr</span> <span class="org-type">T</span> <span class="org-function-name">szudzik_pair</span>(<span class="org-type">T</span> <span class="org-variable-name">x</span>) {
     <span class="org-keyword">return</span> x;
 }
@@ -967,13 +969,13 @@ metaprogramming to recover the list of encoded types in the exact
 order they were encoded.  Second, we want to provide an API that does
 not require the user to wrap the variadic arguments into a type list.
 For the latter purpose, we rename <code>sudzik_unpair</code> function from
-<a href="#org92dd23a">Listing 3</a> into <code>sudzik_unpair__</code>, and use <code>szudzik_pair</code> to name a
+<a href="#org37f747f">Listing 3</a> into <code>sudzik_unpair__</code>, and use <code>szudzik_pair</code> to name a
 convenience function that wraps its template arguments in a type list
 before invoking the actual inversion logic.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 5: </span>Variadic Szudzik unpairing</label><pre class="src src-c++" id="org915678b"><span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 5: </span>Variadic Szudzik unpairing</label><pre class="src src-c++" id="orgc3f6adf"><span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>&gt;
 <span class="org-keyword">constexpr</span> <span class="org-type">T</span> <span class="org-function-name">szudzik_unpair__</span>(<span class="org-type">T</span> <span class="org-variable-name">i</span>) {
     <span class="org-keyword">return</span> i;
 }
@@ -1017,14 +1019,14 @@ of the <code>i</code> component of an object <code>t</code> of type <code>tup</c
 
 <p>
 At last, we can implement a variadic <code>dispatch_enum</code> using a similar
-approach to that of the binary case (<a href="#orgdb9d7d3">Listing 1</a>).  The main difference
+approach to that of the binary case (<a href="#org8393a9a">Listing 1</a>).  The main difference
 being an extra step, performed before any other step, that creates a
 type list out of the <code>enum</code> types &#x2014; this simplifies metaprogramming
 with Boost.Mp11.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 6: </span>Variadic solution</label><pre class="src src-c++" id="org039b92f"><span class="org-keyword">template</span> &lt;<span class="org-keyword">typename</span> <span class="org-type">F</span>, <span class="org-keyword">typename</span>... <span class="org-type">Enums</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 6: </span>Variadic solution</label><pre class="src src-c++" id="orgdf360a5"><span class="org-keyword">template</span> &lt;<span class="org-keyword">typename</span> <span class="org-type">F</span>, <span class="org-keyword">typename</span>... <span class="org-type">Enums</span>&gt;
     <span class="org-keyword">requires</span>(<span class="org-constant">std</span>::<span class="org-constant">is_enum</span>&lt;<span class="org-type">Enums</span>&gt;::value <span class="org-keyword">and</span> ...)
 <span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> <span class="org-function-name">dispatch_enum</span>(<span class="org-type">F</span>&amp;&amp; <span class="org-variable-name">f</span>, <span class="org-type">Enums</span>... <span class="org-variable-name">enums</span>)
     -&gt; <span class="org-keyword">decltype</span>(<span class="org-constant">std</span>::forward&lt;<span class="org-type">F</span>&gt;(<span class="org-type">f</span>)(enum_values&lt;Enums{}...&gt;{})) {
@@ -1072,9 +1074,9 @@ The complete solution is available in <a href="https://godbolt.org/z/eGneqr6jP">
 </div>
 </div>
 
-<div id="outline-container-org90101dc" class="outline-2">
-<h2 id="org90101dc">Conclusion</h2>
-<div class="outline-text-2" id="text-org90101dc">
+<div id="outline-container-org5cb0617" class="outline-2">
+<h2 id="org5cb0617">Conclusion</h2>
+<div class="outline-text-2" id="text-org5cb0617">
 <p>
 Should this have a conclusion?  This was just me showing off something
 I think is cool.  Using math tricks to solve problems is always cool.
