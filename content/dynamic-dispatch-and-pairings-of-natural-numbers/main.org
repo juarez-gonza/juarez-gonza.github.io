@@ -346,11 +346,14 @@ now know it does from the previous chapter.  The proof requires
 constructing an invertible function between $\mathbb{N}$ and
 $\mathbb{N} \times ... \times \mathbb{N}$.  The encoding function we
 will use for the variadic solution of the =enum= dispatching problem
-is the function that concludes this proof.
+is the same exact function that concludes this proof.
 
 
-First, I will present the case for $3$ and $4$ factors to develop some
-intuition.  Later, I will generalize to arbitrary number of factors.
+First, I will present the case for $3$ factors ($\mathbb{N} \times
+\mathbb{N} \times\mathbb{N}$) and $4$ factors ($\mathbb{N} \times
+\mathbb{N} \times\mathbb{N} \times \mathbb{N}$) to develop some
+intuition.  Later, I will generalize to an arbitrary number of
+factors.
 
 If we have a pairing function $e : \mathbb{N} \times \mathbb{N} \to
 \mathbb{N}$, then we can construct a function
