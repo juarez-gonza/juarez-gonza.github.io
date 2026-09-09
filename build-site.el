@@ -25,7 +25,7 @@
       org-export-with-sub-superscripts '{}
       ;; style: simple css
       ;; org-html-head "<link rel=\"stylesheet\" href=\"https://cdn.simplecss.org/simple.min.css\" />"
-      ;; style: gongzhitaao
+      ;; style: gongzhitaao https://github.com/gongzhitaao/orgcss
       org-html-htmlize-output-type 'css ;; needed for gongzhitaao code highlighting
       org-html-head "<link rel=\"stylesheet\" type=\"text/css\" href=\"https://gongzhitaao.org/orgcss/org.css\" />")
 
