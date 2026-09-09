@@ -18,9 +18,6 @@
 (require 'ox-publish)
 ;; (require 'org-special-block-extras)
 
-;; TODO: look into https://taingram.org/blog/org-mode-blog.html to add
-;; navigation bars and use a custom CSS instead
-
 ;; Customize the HTML output
 (setq org-html-validation-link nil            ;; Don't show validation link
       org-html-head-include-scripts nil       ;; Disable org's html default JS
@@ -41,6 +38,9 @@
              :publishing-function 'org-html-publish-to-html
              :publishing-directory "./public"
 	     :base-extension "org"
+             :html-preamble (concat "<div class='topnav'>
+                                     <a href='/index.html'>Home</a>
+                                     </div>")
              :with-author nil      ;; Don't include author name
              :with-creator t       ;; Include Emacs and Org versions in footer
              :with-toc t           ;; Include a table of contents

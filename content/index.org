@@ -1,14 +1,27 @@
-#+title: Maquinola
+#+title: A bit
 
 * What is this?
 
-This is a work-in-progress blog where I intend to upload stuff I do
-not know where to communicate otherwise. Most (all?) of this stuff
-will be programming and/or math related.
+This is a work-in-progress blog for programming and some math stuff.
+I will upload things every now and then.
 
 * Who am I?
 
-I am a programmer (mostly C++) and I like math.
+I am Gonzalo Juarez.  I like some kinds of math and some kinds of
+programming.  Most of the programming I do is in C++, although I take
+heavy influences from other languages and programming paradigms.
+
+** On the usage of generative AI
+
+All the words, code, math and their mistakes in this site are thought
+and written by me.  Usage of generative AI is limited to some of the
+scripts used to draw plots.
+
+** Contact
+
+Reach out via [[mailto:gonzalojuarezte@gmail.com][email (gonzalojuarezte@gmail.com)]] or [[https:linkedin.com/in/gonzalo-juarez-tello-435bb5364][linkedin]] for any
+questions, corrections, discussions, or comments related to the blogs'
+contents.
 
 * Blog Index
 
