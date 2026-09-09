@@ -1,7 +1,7 @@
 #+title: State machines, dynamic multi-dispatch, and pairings of natural numbers
 
-In this post I expose a function that performs function dispatch based
-on more than one =enum= value in C++.
+In this post I expose a higher order function that performs function
+dispatch based on more than one =enum= value in C++.
 
 
 Recently at work I had to implement a finite state machine in C++20.
@@ -10,10 +10,12 @@ state/ and an /input symbol/.  This requires a mechanism to make a
 runtime decision based on more than one parameter, i.e., a
 /multi-dispatch/ facility.  The language offers well-known approaches
 to do so when the decision is based on type-level information (via
-[[https://khuttun.github.io/2017/02/04/implementing-state-machines-with-std-variant.html][=std::variant= and =std::visit=]] or [[https://www.spigotmc.org/threads/implementing-finite-state-machines-with-visitor-design-pattern.336273/][the good old OOP visitor pattern]]).
-When it comes to =enum= values, however, the language and the standard
-library provide nothing of higher level than =switch= statements and
-chaining of =if/else= statements.
+[[https://khuttun.github.io/2017/02/04/implementing-state-machines-with-std-variant.html][=std::variant= and =std::visit=]] or
+[[https://www.spigotmc.org/threads/implementing-finite-state-machines-with-visitor-design-pattern.336273/][the
+good old OOP visitor pattern]]).  When it comes to =enum= values,
+however, the language and the standard library provide no constructs
+of higher level than =switch= statements and chaining of =if/else=
+statements.
 
 
 The solution I will present for this problem makes use of some maths
