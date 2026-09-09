@@ -19,10 +19,9 @@
 ;; (require 'org-special-block-extras)
 
 ;; Customize the HTML output
-(setq org-html-validation-link nil      ;; Don't show validation link
-      org-html-head-include-scripts nil ;; Use our own scripts
+(setq org-html-validation-link nil            ;; Don't show validation link
+      org-html-head-include-scripts nil       ;; Use our own scripts
       org-html-head-include-default-style nil ;; Use our own styles
-      org-export-with-sub-superscripts '{}
       ;; style: simple css
       ;; org-html-head "<link rel=\"stylesheet\" href=\"https://cdn.simplecss.org/simple.min.css\" />"
       ;; style: gongzhitaao https://github.com/gongzhitaao/orgcss
@@ -38,11 +37,12 @@
              :base-directory "./content"
              :publishing-function 'org-html-publish-to-html
              :publishing-directory "./public"
-             :with-author nil ;; Don't include author name
-             :with-creator t ;; Include Emacs and Org versions in footer
-             :with-toc t     ;; Include a table of contents
-             :section-numbers nil   ;; Don't include section numbers
-             :time-stamp-file nil) ;; Don't include time stamp in file
+	     :base-extension "org"
+             :with-author nil      ;; Don't include author name
+             :with-creator t       ;; Include Emacs and Org versions in footer
+             :with-toc t           ;; Include a table of contents
+             :section-numbers nil  ;; Don't include section numbers
+	     :time-stamp-file nil) ;; Don't include time stamp in file
 
        ;; Images and other static files
        (list "org-site:static"

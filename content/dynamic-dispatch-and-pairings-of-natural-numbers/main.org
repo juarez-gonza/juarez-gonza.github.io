@@ -1,4 +1,3 @@
-#+options: ^:nil
 #+title: State machines, dynamic multi-dispatch, and pairings of natural numbers
 
 Recently at work I had to write a finite state machine in C++20.  A
