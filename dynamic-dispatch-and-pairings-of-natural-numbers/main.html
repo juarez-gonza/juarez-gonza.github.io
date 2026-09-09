@@ -1,0 +1,1091 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>State machines, dynamic multi-dispatch, and pairings of natural numbers</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="https://gongzhitaao.org/orgcss/org.css" />
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+</head>
+<body>
+<div id="preamble" class="status">
+<div class='topnav'>
+                                     <a href='/index.html'>Home</a>
+                                     </div>
+</div>
+<div id="content" class="content">
+<h1 class="title">State machines, dynamic multi-dispatch, and pairings of natural numbers</h1>
+<div id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org9373594">Problem setup</a></li>
+<li><a href="#org49e710c">An incomplete solution</a></li>
+<li><a href="#org9f995bd">Completing the solution: encoding pairs</a></li>
+<li><a href="#orgb0441d4">Beyond the solution: going variadic</a></li>
+<li><a href="#org90101dc">Conclusion</a></li>
+</ul>
+</div>
+</div>
+<p>
+In this post I expose a function that performs function dispatch based
+on more than one <code>enum</code> value in C++.
+</p>
+
+
+<p>
+Recently at work I had to implement a finite state machine in C++20.
+By definition, state machines must transition based on the <i>current
+state</i> and an <i>input symbol</i>.  This requires a mechanism to make a
+runtime decision based on more than one parameter, i.e., a
+<i>multi-dispatch</i> facility.  The language offers well-known approaches
+to do so when the decision is based on type-level information (via
+<a href="https://khuttun.github.io/2017/02/04/implementing-state-machines-with-std-variant.html"><code>std::variant</code> and <code>std::visit</code></a> or <a href="https://www.spigotmc.org/threads/implementing-finite-state-machines-with-visitor-design-pattern.336273/">the good old OOP visitor pattern</a>).
+When it comes to <code>enum</code> values, however, the language and the standard
+library provide nothing of higher level than <code>switch</code> statements and
+chaining of <code>if/else</code> statements.
+</p>
+
+
+<p>
+The solution I will present for this problem makes use of some maths
+and metaprogramming. After presenting the solution for the binary case
+(sufficient for implementing a state machine), I will present its full
+generalization to dynamic dispatch based on an arbitrary number of
+<code>enum</code> values.
+</p>
+
+
+<div id="outline-container-org9373594" class="outline-2">
+<h2 id="org9373594">Problem setup</h2>
+<div class="outline-text-2" id="text-org9373594">
+<p>
+In order to have something concrete in mind, we will use the finite
+state machine (FSM) described by the transition table below.
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">State\Event</th>
+<th scope="col" class="org-left">a</th>
+<th scope="col" class="org-left">b</th>
+<th scope="col" class="org-left">c</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">A (initial)</td>
+<td class="org-left">A</td>
+<td class="org-left">B</td>
+<td class="org-left">C</td>
+</tr>
+
+<tr>
+<td class="org-left">B</td>
+<td class="org-left">B</td>
+<td class="org-left">C</td>
+<td class="org-left">D</td>
+</tr>
+
+<tr>
+<td class="org-left">C</td>
+<td class="org-left">C</td>
+<td class="org-left">B</td>
+<td class="org-left">D</td>
+</tr>
+
+<tr>
+<td class="org-left">D (final)</td>
+<td class="org-left">-</td>
+<td class="org-left">-</td>
+<td class="org-left">-</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+A dash ('-') is used to indicate that there are no transitions from
+the <code>(state, input)</code> pair of the given row and column.  Reaching such
+transitions is considered an error.  Alternatively, we could make an
+error state and have several final states.  Representing errors in one
+way or the other would not affect our multi-dispatch solution, so we
+will not be wasting any more time on the finer details of the FSM
+construction.
+</p>
+
+<p>
+The <code>enum</code> types for this state machine are defined as follows
+</p>
+
+<div class="org-src-container">
+<pre class="src src-c++"><span class="org-keyword">enum</span> <span class="org-keyword">class</span> <span class="org-type">states</span> : <span class="org-constant">std</span>::<span class="org-type">uint16_t</span> { <span class="org-variable-name">A</span>, <span class="org-variable-name">B</span>, <span class="org-variable-name">C</span>, <span class="org-variable-name">D</span> };
+<span class="org-keyword">enum</span> <span class="org-keyword">class</span> <span class="org-type">inputs</span> : <span class="org-constant">std</span>::<span class="org-type">uint32_t</span> { <span class="org-variable-name">a</span>, <span class="org-variable-name">b</span>, <span class="org-variable-name">c</span> };
+</pre>
+</div>
+
+<p>
+A naive solution can make use of nested conditionals to choose a
+behavior based on the values of state and input:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-c++"><span class="org-type">int</span> <span class="org-function-name">dispatch_nested</span>(<span class="org-type">inputs</span> <span class="org-variable-name">x</span>, <span class="org-type">states</span> <span class="org-variable-name">y</span>) {
+    <span class="org-keyword">switch</span> (x) {
+        <span class="org-keyword">case</span> <span class="org-constant">inputs</span>::a:
+            <span class="org-keyword">switch</span> (y) {
+                <span class="org-keyword">case</span> <span class="org-constant">states</span>::A:
+                    <span class="org-keyword">return</span> a();
+                <span class="org-keyword">case</span> <span class="org-constant">states</span>::B:
+                    <span class="org-keyword">return</span> b();
+                <span class="org-keyword">case</span> <span class="org-constant">states</span>::C:
+                    <span class="org-keyword">return</span> c();
+                <span class="org-keyword">case</span> <span class="org-constant">states</span>::D:
+                    <span class="org-keyword">return</span> d();
+                <span class="org-keyword">default</span>:
+                    <span class="org-keyword">return</span> handle_error();
+            }
+
+        <span class="org-keyword">case</span> <span class="org-constant">inputs</span>::b:
+            <span class="org-keyword">switch</span> (y) {
+                <span class="org-keyword">case</span> <span class="org-constant">states</span>::A:
+                    <span class="org-keyword">return</span> f();
+                <span class="org-keyword">case</span> <span class="org-constant">states</span>::B:
+                    <span class="org-keyword">return</span> g();
+                <span class="org-keyword">case</span> <span class="org-constant">states</span>::C:
+                    <span class="org-keyword">return</span> h();
+                <span class="org-keyword">case</span> <span class="org-constant">states</span>::D:
+                    <span class="org-keyword">return</span> i();
+                <span class="org-keyword">default</span>:
+                    <span class="org-keyword">return</span> handle_error();
+            }
+
+        <span class="org-keyword">case</span> <span class="org-constant">inputs</span>::c:
+            <span class="org-keyword">switch</span> (y) {
+                <span class="org-keyword">case</span> <span class="org-constant">states</span>::A:
+                    <span class="org-keyword">return</span> k();
+                <span class="org-keyword">case</span> <span class="org-constant">states</span>::B:
+                    <span class="org-keyword">return</span> l();
+                <span class="org-keyword">case</span> <span class="org-constant">states</span>::C:
+                    <span class="org-keyword">return</span> a();
+                <span class="org-keyword">case</span> <span class="org-constant">states</span>::D:
+                    <span class="org-keyword">return</span> g();
+                <span class="org-keyword">default</span>:
+                    <span class="org-keyword">return</span> handle_error();
+            }
+
+        <span class="org-keyword">default</span>:
+            <span class="org-keyword">return</span> handle_error();
+    }
+}
+</pre>
+</div>
+
+<p>
+But this has a couple potential issues:
+</p>
+
+<ol class="org-ol">
+<li><b><b>Maintainability</b></b>. The <code>enum</code> types in the example enumerate a
+short list of values.  Some FSMs that show up in practice would not
+fit as nicely in the page.  Regardless, my initial solution was
+this simple.  Yet in the end I found not having a construct that
+clearly separates dispatching logic from business logic to be a
+maintainability burden.</li>
+
+<li><b><b>Suboptimal?</b></b> Maybe. In all honesty, I have not played with
+(profiled) <code>switch</code> optimizations as much as <a href="https://xoranth.net/verb-parse/">other people have</a>. But
+in this post I want to experiment with branching based on a single
+value that encodes <code>state</code> and <code>input</code>, instead of sequentially
+branching based on individual <code>enum</code> values.  Additionally, it
+would be nice for these encoded values to be densely distributed
+since this encourages the compiler to <a href="https://youtu.be/gMqSinyL8uk">lower the <code>switch</code></a> to a
+compactly represented <i>jump table</i>.</li>
+</ol>
+</div>
+</div>
+
+
+<div id="outline-container-org49e710c" class="outline-2">
+<h2 id="org49e710c">An incomplete solution</h2>
+<div class="outline-text-2" id="text-org49e710c">
+<p>
+We begin designing the solution by specifying the signature of the
+function that performs dynamic dispatch over <code>enum</code> values, and
+showing one possible way to use this function to implement the FSM of
+the previous section.
+</p>
+
+<p>
+The signature of the dispatching function is
+</p>
+
+<div class="org-src-container">
+<pre class="src src-c++"><span class="org-keyword">template</span> &lt;<span class="org-keyword">typename</span> <span class="org-type">StateT</span>, <span class="org-keyword">typename</span> <span class="org-type">InputT</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
+    <span class="org-keyword">requires</span> <span class="org-constant">std</span>::<span class="org-type">is_enum_v</span>&lt;<span class="org-type">StateT</span>&gt; <span class="org-keyword">and</span> <span class="org-constant">std</span>::<span class="org-type">is_enum_v</span>&lt;<span class="org-type">InputT</span>&gt;
+<span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> dispatch_enum(F&amp;&amp; f, <span class="org-type">StateT</span> <span class="org-variable-name">state</span>, InputT input)
+    -&gt; <span class="org-keyword">decltype</span>(<span class="org-constant">std</span>::forward&lt;<span class="org-type">F</span>&gt;(<span class="org-type">f</span>)(enum_values&lt;StateT{}, InputT{}&gt;{})) {
+</pre>
+</div>
+
+<p>
+Note. The <code>enum_values</code> tag lifts the values enumerated by <code>StateT</code>
+and <code>InputT</code> into types &#x2014; basically a type alias to an
+<code>std::integral_constant</code> of a tuple-like type.
+</p>
+
+<p>
+The previously described FSM can be implemented using <code>dispatch_enum</code>
+in the following manner:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-c++"><span class="org-keyword">struct</span> <span class="org-type">fsm</span> {
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name">()</span>(<span class="org-keyword">auto</span>) { <span class="org-keyword">throw</span> <span class="org-constant">std</span>::domain_error{<span class="org-string">"invalid transition"</span>}; }
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name">()</span>(<span class="org-type">enum_values</span>&lt;<span class="org-constant">states</span>::A, <span class="org-constant">inputs</span>::a&gt;) {
+        s = <span class="org-constant">states</span>::A;
+        <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"(A, a) -&gt; A\n"</span>;
+    }
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name">()</span>(<span class="org-type">enum_values</span>&lt;<span class="org-constant">states</span>::A, <span class="org-constant">inputs</span>::b&gt;) {
+        s = <span class="org-constant">states</span>::B;
+        <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"(A, b) -&gt; B\n"</span>;
+    }
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name">()</span>(<span class="org-type">enum_values</span>&lt;<span class="org-constant">states</span>::A, <span class="org-constant">inputs</span>::c&gt;) {
+        s = <span class="org-constant">states</span>::C;
+        <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"(A, c) -&gt; C\n"</span>;
+    }
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name">()</span>(<span class="org-type">enum_values</span>&lt;<span class="org-constant">states</span>::B, <span class="org-constant">inputs</span>::a&gt;) {
+        s = <span class="org-constant">states</span>::B;
+        <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"(B, a) -&gt; B\n"</span>;
+    }
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name">()</span>(<span class="org-type">enum_values</span>&lt;<span class="org-constant">states</span>::B, <span class="org-constant">inputs</span>::b&gt;) {
+        s = <span class="org-constant">states</span>::C;
+        <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"(B, b) -&gt; C\n"</span>;
+    }
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name">()</span>(<span class="org-type">enum_values</span>&lt;<span class="org-constant">states</span>::B, <span class="org-constant">inputs</span>::c&gt;) {
+        s = <span class="org-constant">states</span>::D;
+        <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"(B, c) -&gt; D\n"</span>;
+    }
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name">()</span>(<span class="org-type">enum_values</span>&lt;<span class="org-constant">states</span>::C, <span class="org-constant">inputs</span>::a&gt;) {
+        s = <span class="org-constant">states</span>::C;
+        <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"(C, a) -&gt; C\n"</span>;
+    }
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name">()</span>(<span class="org-type">enum_values</span>&lt;<span class="org-constant">states</span>::C, <span class="org-constant">inputs</span>::b&gt;) {
+        s = <span class="org-constant">states</span>::B;
+        <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"(C, b) -&gt; B\n"</span>;
+    }
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name">()</span>(<span class="org-type">enum_values</span>&lt;<span class="org-constant">states</span>::C, <span class="org-constant">inputs</span>::c&gt;) {
+        s = <span class="org-constant">states</span>::D;
+        <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"(C, c) -&gt; D\n"</span>;
+    }
+
+    [[nodiscard]] <span class="org-keyword">constexpr</span> <span class="org-type">bool</span> <span class="org-function-name">done</span>() <span class="org-keyword">const</span> { <span class="org-keyword">return</span> s == <span class="org-constant">states</span>::D; }
+
+    <span class="org-keyword">constexpr</span> <span class="org-type">void</span> <span class="org-function-name">transition</span>(<span class="org-type">inputs</span> <span class="org-variable-name">e</span>) { dispatch_enum(*<span class="org-keyword">this</span>, s, e); };
+    <span class="org-type">states</span> <span class="org-variable-name">s</span>{<span class="org-constant">states</span>::A};
+};
+</pre>
+</div>
+
+<p>
+Input is fed to the state machine using the <code>fsm::transition</code>
+function.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-c++"><span class="org-keyword">auto</span> <span class="org-variable-name">f</span> = fsm{};
+f.transition(<span class="org-constant">inputs</span>::b);
+f.transition(<span class="org-constant">inputs</span>::b);
+f.transition(<span class="org-constant">inputs</span>::c);
+assert(f.done());
+</pre>
+</div>
+
+<p>
+From both the signature of <code>dispatch_enum</code> and its expected usage we
+can come up with a rough plan to implement <code>dispatch_enum</code>.  We will
+divide the algorithm into two parts: compile time and runtime work.
+</p>
+
+<ol class="org-ol">
+<li>At compile time
+
+<ol class="org-ol">
+<li><a id="org900ce82"></a> List the values enumerated by <code>StateT</code> and
+<code>InputT</code>, denote them <code>states</code> and <code>inputs</code>, respectively.</li>
+
+<li><a id="org8b12752"></a> Map each value in <code>states</code> to a distinct
+<code>integral</code>.  Do the same with <code>inputs</code> (one input and one state
+may share a mapping value).  Denote that mapping function by
+<code>u</code>.</li>
+
+<li>Obtain the cartesian product of the lists of <code>integral</code> values
+from the previous step.</li>
+
+<li><p>
+<a id="org7aa4c51"></a> Encode each pair in the cartesian product to a
+unique <code>integral</code> using an encoding function <code>e</code>.  Denote the
+resulting list by <code>encodings</code>.
+</p>
+
+<p>
+Note. The last three steps can be summarized in a mathematical
+formula as obtaining the set of <code>encodings</code> given by
+</p>
+
+<p>
+\[\{ e(u(state), u(input)) : state \in StateT, input \in InputT\}.\]
+</p></li>
+
+<li>Construct a dispatching mechanism (<code>switch</code>) based on a single
+runtime value, using the values in <code>encodings</code> as the
+discriminants (values associated to <code>case</code> labels).</li>
+
+<li><p>
+<a id="org87f0ee6"></a> Inside each <code>case</code> block, where the associated
+discriminant <code>d</code> is known at compile time, use the inverse of
+the encoding function <code>e</code> and the inverse of <code>u</code> to obtain
+compile time values <code>(state, input)</code> such that <code>e(u(state),
+      u(input)) = d</code>.  Immediately after, invoke the argument function
+<code>f</code> using an <code>enum_values</code> tag constructed from <code>state</code> and
+<code>input</code>.
+</p>
+
+<p>
+Note. The inverses of <code>e</code> and <code>u</code> exist because of the "unique"
+and "distinct" requirements in their defining wordings (at steps
+<a href="#org7aa4c51">1.4</a> and <a href="#org8b12752">1.2</a>, resp.).
+</p></li>
+</ol></li>
+
+<li>At runtime
+
+<ol class="org-ol">
+<li>Obtain the encoding of the input arguments <code>encoded =
+      e(u(state), u(input))</code>.</li>
+
+<li>Dispatch using <code>encoded</code> as the sole argument on which branching
+is based.</li>
+</ol></li>
+</ol>
+
+
+<p>
+The enumeration of values enumerated by an <code>enum</code> in <a href="#org900ce82">step 1.1</a> can be
+obtained in a variety of ways.  I chose to use the
+<code>magic_enum::enum_values</code> function from the infamous <a href="https://github.com/Neargye/magic_enum/tree/master">magic<sub>enum</sub></a>
+library.  I think that library allows me to provide the cleanest API
+in the pre reflection era (recall the solution is constrained to
+C++20).
+</p>
+
+
+<p>
+The function <code>u</code> of <a href="#org8b12752">step 1.2</a> can be a <code>static_cast</code> from an <code>enum</code> to
+its <code>std::underlying_type_t</code>.  Its inverse, which is required for <a href="#org87f0ee6">step
+1.6</a>, is the construction of an <code>enum</code> from a value of its underlying
+type &#x2014; possible via brace-initialization since C++17, see <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0138r2.pdf">P0138</a>.
+</p>
+
+
+<p>
+For the metaprogramming required to do most of the compile time work
+as well as for the generation of the dispatching logic from a single
+encoding value, I chose to use the metaprogramming library <a href="https://www.boost.org/doc/libs/latest/libs/mp11/doc/html/mp11.html">Boost.Mp11</a>.
+</p>
+
+
+<p>
+The only remaining blank is the encoding function <code>e</code>.  Here is where
+the maths explained in the next chapter comes in.  Leaving the
+definition of the encoding function in suspense for now, the algorithm
+just described can be written as follows
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 1: </span>Basic solution with missing encoding function</label><pre class="src src-c++" id="orgdb9d7d3"><span class="org-keyword">template</span> &lt;<span class="org-keyword">typename</span> <span class="org-type">StateT</span>, <span class="org-keyword">typename</span> <span class="org-type">InputT</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
+    <span class="org-keyword">requires</span> <span class="org-constant">std</span>::<span class="org-type">is_enum_v</span>&lt;<span class="org-type">StateT</span>&gt; <span class="org-keyword">and</span> <span class="org-constant">std</span>::<span class="org-type">is_enum_v</span>&lt;<span class="org-type">InputT</span>&gt;
+<span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> dispatch_enum(F&amp;&amp; f, <span class="org-type">StateT</span> <span class="org-variable-name">state</span>, InputT input)
+    -&gt; <span class="org-keyword">decltype</span>(<span class="org-constant">std</span>::forward&lt;<span class="org-type">F</span>&gt;(<span class="org-type">f</span>)(enum_values&lt;StateT{}, InputT{}&gt;{})) {
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Alias to a metafunction for steps 1.1 and 1.2
+</span>    <span class="org-keyword">using</span> <span class="org-type">to_integral_values</span> =
+        <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_compose</span>&lt;mp_enum_to_enum_values,
+                                mp_enum_values_to_underlying&gt;;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Steps 1.1 and 1.2
+</span>    <span class="org-keyword">using</span> <span class="org-type">integral_states</span> = <span class="org-constant">to_integral_values</span>::<span class="org-type">fn</span>&lt;<span class="org-type">StateT</span>&gt;;
+    <span class="org-keyword">using</span> <span class="org-type">integral_inputs</span> = <span class="org-constant">to_integral_values</span>::<span class="org-type">fn</span>&lt;<span class="org-type">InputT</span>&gt;;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Steps 1.3 and 1.4 with metafunction for encoding `e` as
+</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">mp_e_???.
+</span>    <span class="org-keyword">using</span> <span class="org-type">encoded_pairs</span> =
+        <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_product</span>&lt;mp_e_???, <span class="org-type">integral_states</span>,
+                                <span class="org-type">integral_inputs</span>&gt;;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Helper for step 1.5
+</span>    <span class="org-keyword">using</span> <span class="org-type">max_code</span> =
+        <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_max_element</span>&lt;<span class="org-type">encoded_pairs</span>, <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::mp_less&gt;;
+
+    <span class="org-keyword">using</span> <span class="org-type">encoded_type</span> = <span class="org-constant">max_code</span>::value_type;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Step 2.1 with runtime encoding `e` as e_???
+</span>    <span class="org-type">encoded_type</span> <span class="org-variable-name">encoded</span> =
+        e_???(<span class="org-keyword">static_cast</span>&lt;<span class="org-constant">std</span>::<span class="org-type">underlying_type_t</span>&lt;<span class="org-type">StateT</span>&gt;&gt;(state),
+                     <span class="org-keyword">static_cast</span>&lt;<span class="org-constant">std</span>::<span class="org-type">underlying_type_t</span>&lt;<span class="org-type">InputT</span>&gt;&gt;(input));
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Step 1.5 at compile time with mp_with_index
+</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">Step 2.2 at runtime
+</span>    <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::mp_with_index&lt;<span class="org-type">max_code</span>&gt;(encoded, [&amp;](<span class="org-keyword">auto</span> <span class="org-variable-name">i</span>) {
+        <span class="org-comment-delimiter">// </span><span class="org-comment">Step 1.6 with compile time inverse of encoding `e` as
+</span>        <span class="org-comment-delimiter">// </span><span class="org-comment">e_???_inv
+</span>        <span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> <span class="org-variable-name">decoded_pair</span> =
+          e_???_inv&lt;<span class="org-constant">std</span>::<span class="org-type">underlying_type_t</span>&lt;<span class="org-type">StateT</span>&gt;,
+                    <span class="org-constant">std</span>::<span class="org-type">underlying_type_t</span>&lt;<span class="org-type">InputT</span>&gt;&gt;(<span class="org-keyword">static_cast</span>&lt;<span class="org-type">encoded_type</span>&gt;(<span class="org-keyword">decltype</span>(i)::value));
+        <span class="org-constant">std</span>::forward&lt;<span class="org-keyword">decltype</span>(f)&gt;(<span class="org-type">f</span>)(
+            enum_values&lt;StateT{decoded_pair.first},
+                        InputT{decoded_pair.second}&gt;{});
+    });
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org9f995bd" class="outline-2">
+<h2 id="org9f995bd">Completing the solution: encoding pairs</h2>
+<div class="outline-text-2" id="text-org9f995bd">
+<p>
+In order to fill the missing blanks in <a href="#orgdb9d7d3">Listing 1</a> , we need to define
+an encoding function, that is, an invertible function which maps two
+<code>integral</code> numbers into one <code>integral</code> value.  This task requires some
+math.  To simplify the problem, we will disregard negative values
+(i.e., we will work with <code>unsigned integral</code>).
+</p>
+
+
+<p>
+If we ignore the fact that computers work with fix-width integers,
+then we could consider the (unsigned) underlying type of an <code>enum</code> to
+be the set of natural numbers \(\mathbb{N}\) (\(0\) included).  This
+allows us to express the encoding problem in mathematical terms as the
+problem of finding an invertible function from the set of pairs of
+natural numbers \(\mathbb{N} \times \mathbb{N}\) to \(\mathbb{N}\).
+</p>
+
+
+<p>
+Functions with these characteristics are well-known objects in
+mathematics called <a href="https://en.wikipedia.org/wiki/Pairing_function">pairing functions</a>.  There are <a href="https://drhagen.com/blog/superior-pairing-function/">many pairing
+functions</a>.  I considered the following:
+</p>
+
+<ul class="org-ul">
+<li><p>
+Pairing based on the <a href="https://en.wikipedia.org/wiki/Fundamental_theorem_of_arithmetic">Fundamental Theorem of Arithmetic</a> (FTA).  This
+pairing function uses the fact that any integer greater than \(1\) has
+a unique representation as a product of powers of primes.  Such a
+pairing \(f\) can be defined as
+</p>
+
+<p>
+\[
+     f : \mathbb{N} \times \mathbb{N} \to \mathbb{N},\quad f(a,b) := 2^a 3^b.
+  \]
+</p>
+
+<p>
+After staring at the definition of \(f\) for a while, it is clear that
+we cannot use this pairing for at least two reasons:
+</p>
+
+<ol class="org-ol">
+<li>First, the range of \(f\) is too sparse. Two numbers in the range
+of \(f\) have a gap between them of at least a factor of \(2\)
+between them.  This sparsity is unlikely to encourge the emision
+of jump tables.</li>
+
+<li><p>
+The second problem is related to the finite nature of computers.
+If we worked with <code>std::uint64_t</code>, trouble would arise when the
+sum of the <code>enum</code> values \(a\) and \(b\) being mapped is equal to or
+greater than \(64\).  This occurs because
+</p>
+
+<p>
+\[ f(a,b) \geq 2^a3^b \geq 2^{a+b} \gt 2^{64}-1 \]
+</p>
+
+<p>
+implies <code>std::uint64_t</code> is overflown! \(\mathbb{N} \neq\) <code>std::uint64_t</code>.
+</p>
+
+<p>
+(For those interested in the inverse \(f^{-1}\), I recommend the
+introductory chapters on recursive functions in <a href="https://www.cambridge.org/core/books/computability-and-logic/440B4178B7CBF1C241694233716AB271">Computability and
+Logic by Boolos, Burgess, &amp; Jeffrey 5th ed</a>)
+</p></li>
+</ol></li>
+
+<li><p>
+The <a href="https://en.wikipedia.org/wiki/Pairing_function#Cantor_pairing_function">Cantor pairing function</a> can be visualized in the a 2D graph as a
+walk through the diagonals of the graph.
+</p>
+
+
+<div id="org15da0f6" class="figure">
+<p><img src="img/cantor_pairing_light.svg" alt="cantor_pairing_light.svg" class="org-svg" style="width:80%" />
+</p>
+<p><span class="figure-number">Figure 1: </span>Cantor pairing function (image from <a href="https://drhagen.com/blog/superior-pairing-function/">drhagen's blog</a>)</p>
+</div>
+
+<p>
+Hopefully it is clear from the picture that the gap between
+subsequent steps of the walk does not increase by powers of \(2\),
+making the Cantor pairing not as prone to overflow as the FTA
+pairing.  To get an impression of the distribution of the range of
+the Cantor pairing, the figure below shows the distribution of the
+encodings of all pairs in the set \(S := \{(x, y) \in \mathbb{N} : x,
+  y \lt 20\}\).
+</p>
+
+
+<div id="org6a2365a" class="figure">
+<p><img src="img/cantor-20-20.png" alt="cantor-20-20.png" style="width:80%" />
+</p>
+<p><span class="figure-number">Figure 2: </span>Distribution of range of Cantor pairing</p>
+</div>
+
+<p>
+Even though we are only plotting the first \(400\) values (in the
+\(L_{\infty}\) metric w.r.t. \((0,0)\)), notice that the encodings reach
+values beyond \(700\).  The gap between encodings becomes larger as
+the encodings themselves attain larger values.  Again, sparsity
+might be problematic to encourage the generation of jump tables.
+</p></li>
+
+<li><p>
+The <a href="http://szudzik.com/ElegantPairing.pdf">Szudzik pairing function</a>, like the Cantor pairing, can be
+visualized as a walk through a graph.  In this case the walk can be
+seen as tracing the perimeter of increasingly larger squares.
+</p>
+
+
+<div id="orgeca68fd" class="figure">
+<p><img src="img/szudzik_pairing_light.svg" alt="szudzik_pairing_light.svg" class="org-svg" style="width:80%" />
+</p>
+<p><span class="figure-number">Figure 3: </span>Szudzik pairing function (image from <a href="https://drhagen.com/blog/superior-pairing-function/">drhagen's blog</a>)</p>
+</div>
+
+<p>
+The approach of Szudzik achieves a very dense, uniformly distributed
+range, which makes it a good fit for our needs.  The picture below
+shows the distribution of the image of the set \(S\) (used for <a href="#org6a2365a">Figure
+2</a>) under Szudzik pairing function.
+</p>
+
+
+<div id="orge3debd3" class="figure">
+<p><img src="img/szudzik-20-20.png" alt="szudzik-20-20.png" style="width:80%" />  
+</p>
+<p><span class="figure-number">Figure 4: </span>Distribution of range of Szudzik pairing</p>
+</div></li>
+</ul>
+
+<p>
+Szudzik pairing formula reads
+</p>
+
+\begin{equation*}
+  s(x, y) :=
+  \begin{cases}
+  x + y^2 &\text{if } y \ge x\\
+  x^2 + x + y&\text{otherwise}
+  \end{cases},
+\end{equation*}
+
+<p>
+and this is how it looks implemented in C++
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 2: </span>Szudzik pairing</label><pre class="src src-c++" id="orgcddad52"><span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>, <span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">S</span>&gt;
+<span class="org-keyword">constexpr</span> <span class="org-type">unsigned_arithmetic_result_t</span>&lt;<span class="org-type">T</span>, <span class="org-type">S</span>&gt; <span class="org-function-name">szudzik_pair</span>(<span class="org-type">T</span> <span class="org-variable-name">x</span>, <span class="org-type">S</span> <span class="org-variable-name">y</span>) {
+    <span class="org-keyword">return</span> y &gt; x ? x + y * y : x * x + x + y;
+}
+</pre>
+</div>
+
+<p>
+Note. <code>unsigned_arithmetic_result_t</code> is similar to
+<code>std::common_type_t</code> in spirit. It is basically the smallest unsigned
+integral type that can accommodate for the result of operations
+between <code>T</code> / <code>S</code>, <code>T</code> / <code>T</code>, and <code>S</code> / <code>S</code>.  Enabling
+<code>-Wsign-conversion</code> makes the return statement explode due to the
+<a href="https://en.cppreference.com/cpp/language/usual_arithmetic_conversions">usual arithmetic conversions</a>.  But I am too lazy to do the (extensive)
+proof by cases that I think could get rid of <code>-Wsign-conversion</code>
+warnings for any <code>T</code> and <code>S</code>.
+</p>
+
+<p>
+The inverse of the Szudzik pairing is given by
+</p>
+
+\begin{equation*}  
+ s^{-1}(z) :=
+   \begin{cases}
+  (z - (\lfloor \sqrt{z} \rfloor)^2, \lfloor \sqrt{z} \rfloor) &\text{if } z - (\lfloor \sqrt{z} \rfloor)^2 < \lfloor \sqrt{z} \rfloor \\
+  (\lfloor \sqrt{z} \rfloor, z - (\lfloor \sqrt{z} \rfloor)^2 - \lfloor \sqrt{z} \rfloor) &\text{otherwise}
+  \end{cases},
+\end{equation*}  
+
+<p>
+which is implemented by
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 3: </span>Szudzik unpairing</label><pre class="src src-c++" id="org92dd23a"><span class="org-comment-delimiter">// </span><span class="org-comment">need for constexpr
+</span><span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>&gt;
+<span class="org-keyword">constexpr</span> <span class="org-type">T</span> <span class="org-function-name">isqrt</span>(<span class="org-type">T</span> <span class="org-variable-name">x</span>) {
+    <span class="org-type">T</span> <span class="org-variable-name">out</span>{};
+    <span class="org-keyword">for</span> (; (out + 1) * (out + 1) &lt;= x; out++);
+    <span class="org-keyword">return</span> out;
+}
+
+<span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>, <span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-variable-name">S</span>,
+          <span class="org-constant">std</span>::<span class="org-type">same_as</span>&lt;<span class="org-type">unsigned_arithmetic_result_t</span>&lt;<span class="org-type">T</span>, S&gt;&gt; <span class="org-variable-name">I</span>&gt;
+<span class="org-keyword">constexpr</span> <span class="org-constant">std</span>::<span class="org-type">pair</span>&lt;<span class="org-type">T</span>, S&gt; <span class="org-function-name">szudzik_unpair</span>(<span class="org-type">I</span> <span class="org-variable-name">x</span>) {
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Cannot use variables for common subexpressions due to constexpr
+</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">constraints:
+</span>    <span class="org-comment-delimiter">//</span><span class="org-comment">
+</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">q = isqrt(x)
+</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">l = x - isqrt(x) * isqrt(x)
+</span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Casts shouldn't cause a narrowing issue here, as we have
+</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">already checked I == unsigned_arithmetic_result_t&lt;T, S&gt;. Moreover, we
+</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">know the values come from a szudzik_pair function so the
+</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">decomposition lies in the correct range of values for T and S
+</span>    <span class="org-keyword">return</span> (x - isqrt(x) * isqrt(x)) &lt; isqrt(x)
+               ? <span class="org-constant">std</span>::pair{<span class="org-keyword">static_cast</span>&lt;<span class="org-type">T</span>&gt;(x - isqrt(x) * isqrt(x)),
+                           <span class="org-keyword">static_cast</span>&lt;S&gt;(isqrt(x))}
+               : <span class="org-constant">std</span>::pair{
+                     <span class="org-keyword">static_cast</span>&lt;<span class="org-type">T</span>&gt;(isqrt(x)),
+                     <span class="org-keyword">static_cast</span>&lt;S&gt;((x - isqrt(x) * isqrt(x)) - isqrt(x))};
+}
+</pre>
+</div>
+
+<p>
+Here we had to implement our own <code>unsigned integral</code> approximation of
+the square root and take some precautions to preserve <code>constexpr</code>, but
+nothing too crazy.
+</p>
+
+
+<p>
+Filling the missing blanks at this point is just a matter of
+programming, I will leave the full solution in this <a href="https://godbolt.org/z/WzbMofvKh">Compiler Explorer</a>
+link.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb0441d4" class="outline-2">
+<h2 id="orgb0441d4">Beyond the solution: going variadic</h2>
+<div class="outline-text-2" id="text-orgb0441d4">
+<p>
+Given the impossibility of counting the number of elements of infinite
+sets using enumeration techniques, the existence of an invertible
+function between two sets is used to determine if the sets have the
+same "size".  When an invertible function between sets \(A\) and \(B\)
+exists, we annotate it as \(A \cong B\).
+</p>
+
+
+<p>
+Pairing functions are often introduced in mathematics with the purpose
+of demonstrating \(\mathbb{N} \cong \mathbb{N} \times \mathbb{N}\).
+Some authors quickly follow this proof with a generalization: for any
+finite number of factors \(\mathbb{N} \times ... \times \mathbb{N}
+\cong \mathbb{N}\).
+</p>
+
+
+<p>
+I will now present a slightly informal overview of the proof of
+\(\mathbb{N} \times ... \times \mathbb{N} \cong \mathbb{N}\) when the
+number of factors is greater than \(2\), assuming some pairing function
+\(e : \mathbb{N} \times \mathbb{N} \to \mathbb{N}\) exists &#x2014; which we
+now know it does from the previous chapter.  The proof requires
+constructing an invertible function between \(\mathbb{N}\) and
+\(\mathbb{N} \times ... \times \mathbb{N}\).  The encoding function we
+will use for the variadic solution of the <code>enum</code> dispatching problem
+is the same exact function that concludes this proof.
+</p>
+
+
+<p>
+First, I will present the case for \(3\) factors (\(\mathbb{N} \times
+\mathbb{N} \times\mathbb{N}\)) and \(4\) factors (\(\mathbb{N} \times
+\mathbb{N} \times\mathbb{N} \times \mathbb{N}\)) to develop some
+intuition.  Later, I will generalize to an arbitrary number of
+factors.
+</p>
+
+<p>
+If we have a pairing function \(e : \mathbb{N} \times \mathbb{N} \to
+\mathbb{N}\), then we can construct a function
+</p>
+
+<p>
+\[e' : \mathbb{N} \times \mathbb{N} \times \mathbb{N} \to \mathbb{N},\quad e'(x, y, z) := e(e(x, y), z).\]
+</p>
+
+<p>
+Since \(e\) is invertible, we can define the inverse of \(e'\) by
+</p>
+
+<p>
+\[e'^{-1} : \mathbb{N} \to \mathbb{N} \times \mathbb{N} \times \mathbb{N},\quad e'^{-1}(u) := (\pi_0(e^{-1}(\pi_0(e^{-1}(u)))), \pi_1(e^{-1}(\pi_0(e^{-1}(u)))), \pi_1(e^{-1}(u))).\]
+</p>
+
+<p>
+where
+</p>
+
+<p>
+\[\pi_0(x, y) := x \text{ and } \pi_1(x, y) := y.\]
+</p>
+
+
+<p>
+This concludes the proof of \(\mathbb{N} \cong \mathbb{N} \times
+\mathbb{N} \times \mathbb{N}\), but richer insights come from some
+further massaging of the formulas.
+</p>
+
+
+<p>
+The definition of \(e'^{-1}\) above is quite a mouthful.  This is a
+side-effect of the noise introduced by the projections \(\pi_i\)
+scattered all over the place. If we rewrite it using a function \(c\)
+that appends an element to an \(n\) tuple, yielding an \(n+1\) tuple, then
+we can simplify its definition to
+</p>
+
+<p>
+<a id="org1653d7a"></a>
+</p>
+\begin{equation}
+  e'^{-1}(u) := c(e^{-1}(\pi_0(e^{-1}(u))), \pi_1(e^{-1}(u))).
+\end{equation}
+
+
+<p>
+Similarly, we could rewrite the definition of \(e'\) using the inverse
+of \(c\).  The function \(c^{-1}\) takes as input an \(n\) tuple and yields
+a pair.  The first component of the resulting pair is an \(n-1\) tuple
+that corresponds to the first \(n-1\) components of the input \(n\) tuple.
+The second component of the resulting pair is the last component of
+the input \(n\) tuple.  Now the definition of \(e'\) can be rewritten as
+</p>
+
+<p>
+<a id="orgb2eb9e4"></a>
+</p>
+\begin{equation}
+  e'(x, y, z) := e(e(\pi_0(c^{-1}(x, y, z))), \pi_1(c^{-1}(x, y, z))).
+\end{equation}
+
+<p>
+Now it is clearer to see the structural similarity between \(e'\) and
+its inverse \(e^{-1}\). In <a href="#orgb2eb9e4">Equation 2</a>, \(e'\) first destructs the input
+tuple into smaller parts (via \(c^{-1}\)), then encodes (via \(e\)).  In
+<a href="#org1653d7a">Equation 1</a> , \(e'^{-1}\) first decodes (via \(e^{-1}\)), then constructs a
+larger output tuple (via \(c\)).  We will now proceed to the case for
+\(4\) factors and see if the same patterns emerge.
+</p>
+
+
+<p>
+A function \(e'' : \mathbb{N} \times \mathbb{N} \times \mathbb{N}
+\times \mathbb{N} \to \mathbb{N}\) from the pairing function \(e\) can be
+constructed as follows
+</p>
+
+<p>
+<a id="org84c6f98"></a>
+</p>
+\begin{align}
+e''(w, x, y,z) &:= e(e(e(w, x), y), z)\\
+&= e(e'(w, x, y), z) \notag \\
+&= e(e'(\pi_0(c^{-1}(w,x,y,z))), \pi_1(c^{-1}(w,x,y,z))). \notag
+\end{align}
+
+<p>
+The first expression in <a href="#org84c6f98">Equation 3</a> seems to be the emergence of an
+<a href="https://wiki.haskell.org/index.php?title=Fold">accumulating or folding</a> pattern.  The last two equalities relate \(e''\)
+with the function \(e'\) just developed.
+</p>
+
+
+<p>
+It is evident, from putting the last equality of <a href="#org84c6f98">Equation 3</a> side by
+side with <a href="#orgb2eb9e4">Equation 2</a>, that the common pattern is that of (1) destruct
+the input tuple via \(c^{-1}\); (2) encode a smaller number of elements
+via an encoding function that works for \(n-1\), where \(n\) is the number
+of components in the input tuple; and (3) use one final encoding via
+\(e\).
+</p>
+
+<p>
+The inverse of \(e''\) is
+</p>
+
+<p>
+<a id="orgfb1ac10"></a>
+</p>
+\begin{equation}
+e''^{-1}(u) := c(e'^{-1}(\pi_0(e^{-1}(u))), \pi_1(e^{-1}(u))).
+\end{equation}
+
+<p>
+Putting <a href="#orgb2eb9e4">Equation 4</a> and <a href="#org1653d7a">Equation 1</a> side by side reveals they are,
+actually, quite similar too.
+</p>
+
+
+<p>
+With these structural observations taken into account, we procede to
+write the variadic cases:
+</p>
+
+<p>
+<a id="org7954f81"></a>
+</p>
+\begin{equation}
+ e^{n}(x_1, ..., x_n) :=
+   \begin{cases}
+    x_1 &\text{if } n = 1\\
+    e(e^{n-1}(\pi_{0}(c^{-1}(x_1, ..., x_n))), \pi_{1}(c^{-1}(x_1, ..., x_n))) &\text{otherwise}
+  \end{cases}
+\end{equation}
+
+<p>
+and its inverse
+</p>
+
+<p>
+<a id="org812b715"></a>
+</p>
+\begin{equation}
+ e^{-n}(u) :=
+   \begin{cases}
+    u &\text{if } n = 1\\
+    c(e^{n - 1}(\pi_0(e^{-1}(u))), \pi_1(e^{-1}(u))) &\text{otherwise}
+  \end{cases}.
+\end{equation}
+
+
+<p>
+Using <code>sudzik_pair</code> from <a href="#orgcddad52">Listing 2</a> in place of \(e\), implementing the
+variadic version is not very complicated.  We achieve this by adding
+two new overloads to <code>szudzik_pair</code>, as shown below.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 4: </span>Variadic Szudzik pairing</label><pre class="src src-c++" id="org0833930"><span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>&gt;
+<span class="org-keyword">constexpr</span> <span class="org-type">T</span> <span class="org-function-name">szudzik_pair</span>(<span class="org-type">T</span> <span class="org-variable-name">x</span>) {
+    <span class="org-keyword">return</span> x;
+}
+
+<span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>, <span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">U</span>,
+          <span class="org-constant">std</span>::<span class="org-type">integral</span>... <span class="org-type">Ts</span>&gt;
+<span class="org-keyword">constexpr</span> <span class="org-type">unsigned_arithmetic_result_t</span>&lt;<span class="org-type">T</span>, <span class="org-type">Ts</span>...&gt; <span class="org-function-name">szudzik_pair</span>(<span class="org-type">T</span> <span class="org-variable-name">x</span>, <span class="org-type">U</span> <span class="org-variable-name">y</span>,
+                                                              <span class="org-type">Ts</span>... <span class="org-variable-name">xs</span>) {
+    <span class="org-keyword">return</span> szudzik_pair(szudzik_pair(x, y), xs...);
+}
+</pre>
+</div>
+
+<p>
+The inverse requires some extra work.  First, we need to use some
+metaprogramming to recover the list of encoded types in the exact
+order they were encoded.  Second, we want to provide an API that does
+not require the user to wrap the variadic arguments into a type list.
+For the latter purpose, we rename <code>sudzik_unpair</code> function from
+<a href="#org92dd23a">Listing 3</a> into <code>sudzik_unpair__</code>, and use <code>szudzik_pair</code> to name a
+convenience function that wraps its template arguments in a type list
+before invoking the actual inversion logic.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 5: </span>Variadic Szudzik unpairing</label><pre class="src src-c++" id="org915678b"><span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>&gt;
+<span class="org-keyword">constexpr</span> <span class="org-type">T</span> <span class="org-function-name">szudzik_unpair__</span>(<span class="org-type">T</span> <span class="org-variable-name">i</span>) {
+    <span class="org-keyword">return</span> i;
+}
+
+<span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> <span class="org-function-name">szudzik_unpair_</span>(<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-keyword">auto</span> <span class="org-variable-name">x</span>) {
+    <span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> <span class="org-variable-name">N</span> = <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-constant">mp_size</span>&lt;ts&gt;::value;
+    static_assert(N &gt; 0);
+
+    <span class="org-keyword">using</span> <span class="org-type">fully_decoded</span> = <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_back</span>&lt;ts&gt;;
+    <span class="org-keyword">if</span> <span class="org-keyword">constexpr</span> (N == 1) {
+        <span class="org-keyword">return</span> <span class="org-type">tup</span>&lt;<span class="org-type">fully_decoded</span>&gt;{szudzik_unpair__&lt;<span class="org-type">fully_decoded</span>&gt;(x)};
+    } <span class="org-keyword">else</span> <span class="org-comment-delimiter">/* </span><span class="org-comment">constexpr</span><span class="org-comment-delimiter"> */</span> {
+        <span class="org-keyword">using</span> <span class="org-type">ts_tail</span> = <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_pop_back</span>&lt;ts&gt;;
+        <span class="org-keyword">using</span> <span class="org-type">decoded_unsigned_arithmetic_result_t</span> =
+            <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_fold</span>&lt;<span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_pop_back</span>&lt;<span class="org-type">ts_tail</span>&gt;,
+                                 <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_back</span>&lt;<span class="org-type">ts_tail</span>&gt;,
+                                 <span class="org-type">unsigned_arithmetic_result_t</span>&gt;;
+        <span class="org-keyword">return</span> szudzik_unpair_&lt;<span class="org-type">ts_tail</span>&gt;(
+                   p&lt;0&gt;(szudzik_unpair__&lt;<span class="org-type">decoded_unsigned_arithmetic_result_t</span>,
+                                         <span class="org-type">fully_decoded</span>&gt;(x))) +
+               <span class="org-type">tup</span>&lt;<span class="org-type">fully_decoded</span>&gt;{
+                   p&lt;1&gt;(szudzik_unpair__&lt;<span class="org-type">decoded_unsigned_arithmetic_result_t</span>,
+                                         <span class="org-type">fully_decoded</span>&gt;(x))};
+    }
+}
+
+<span class="org-keyword">template</span> &lt;<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-type">T</span>, <span class="org-constant">std</span>::<span class="org-type">integral</span>... <span class="org-variable-name">Ts</span>&gt;
+<span class="org-keyword">constexpr</span> <span class="org-type">tup</span>&lt;<span class="org-type">T</span>, Ts...&gt; <span class="org-function-name">szudzik_unpair</span>(<span class="org-constant">std</span>::<span class="org-type">unsigned_integral</span> <span class="org-keyword">auto</span> <span class="org-variable-name">x</span>) {
+    <span class="org-keyword">return</span> szudzik_unpair_&lt;<span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_list</span>&lt;<span class="org-type">T</span>, Ts...&gt;&gt;(x);
+}
+</pre>
+</div>
+
+<p>
+In the listing above, <code>tup</code> is a literal type otherwise similar
+<code>std::tuple</code>. The <code>operator+</code> is tuple concatenation.  The projection
+of the <code>i</code> component of an object <code>t</code> of type <code>tup</code> is computed by
+<code>p&lt;i&gt;(t)</code>.
+</p>
+
+
+<p>
+At last, we can implement a variadic <code>dispatch_enum</code> using a similar
+approach to that of the binary case (<a href="#orgdb9d7d3">Listing 1</a>).  The main difference
+being an extra step, performed before any other step, that creates a
+type list out of the <code>enum</code> types &#x2014; this simplifies metaprogramming
+with Boost.Mp11.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 6: </span>Variadic solution</label><pre class="src src-c++" id="org039b92f"><span class="org-keyword">template</span> &lt;<span class="org-keyword">typename</span> <span class="org-type">F</span>, <span class="org-keyword">typename</span>... <span class="org-type">Enums</span>&gt;
+    <span class="org-keyword">requires</span>(<span class="org-constant">std</span>::<span class="org-constant">is_enum</span>&lt;<span class="org-type">Enums</span>&gt;::value <span class="org-keyword">and</span> ...)
+<span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> <span class="org-function-name">dispatch_enum</span>(<span class="org-type">F</span>&amp;&amp; <span class="org-variable-name">f</span>, <span class="org-type">Enums</span>... <span class="org-variable-name">enums</span>)
+    -&gt; <span class="org-keyword">decltype</span>(<span class="org-constant">std</span>::forward&lt;<span class="org-type">F</span>&gt;(<span class="org-type">f</span>)(enum_values&lt;Enums{}...&gt;{})) {
+    <span class="org-keyword">using</span> <span class="org-type">ts</span> = <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_list</span>&lt;<span class="org-type">Enums</span>...&gt;;
+
+    <span class="org-keyword">using</span> <span class="org-type">ts_integral_values</span> = <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_transform_q</span>&lt;
+        <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_compose</span>&lt;mp_enum_to_enum_values,
+                                mp_enum_values_to_underlying&gt;,
+        <span class="org-type">ts</span>&gt;;
+
+    <span class="org-keyword">using</span> <span class="org-type">encoded_pairs</span> =
+        <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_apply</span>&lt;mp_szudzik_pair_over_product, <span class="org-type">ts_integral_values</span>&gt;;
+
+    <span class="org-keyword">using</span> <span class="org-type">max_code</span> =
+        <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::<span class="org-type">mp_max_element</span>&lt;<span class="org-type">encoded_pairs</span>, <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::mp_less&gt;;
+
+    <span class="org-keyword">using</span> <span class="org-type">encoded_type</span> = <span class="org-constant">max_code</span>::value_type;
+
+    <span class="org-type">encoded_type</span> <span class="org-variable-name">encoded</span> =
+        szudzik_pair(<span class="org-keyword">static_cast</span>&lt;<span class="org-constant">std</span>::<span class="org-type">underlying_type_t</span>&lt;<span class="org-type">Enums</span>&gt;&gt;(enums)...);
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Here `encoded` may have been turned into an int due to unsigned_arithmetic_t.
+</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">-Wsign-conversion will yell because mp_with_index converts to
+</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">std::size_t. But we know we are operating with unsigned numbers (problem
+</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">restriction)
+</span>    <span class="org-keyword">return</span> <span class="org-constant">boost</span>::<span class="org-constant">mp11</span>::mp_with_index&lt;<span class="org-type">max_code</span>&gt;(
+        <span class="org-keyword">static_cast</span>&lt;<span class="org-constant">std</span>::<span class="org-type">size_t</span>&gt;(encoded), [&amp;](<span class="org-keyword">auto</span> <span class="org-variable-name">i</span>) {
+            <span class="org-comment-delimiter">// </span><span class="org-comment">decltype(i)::value_type == std::size_t, but we know it fits in
+</span>            <span class="org-comment-delimiter">// </span><span class="org-comment">the range of encoded_type (since it is &lt;= max_code)
+</span>            <span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> <span class="org-variable-name">decoded_pair</span> =
+                szudzik_unpair&lt;<span class="org-constant">std</span>::<span class="org-type">underlying_type_t</span>&lt;<span class="org-type">Enums</span>&gt;...&gt;(
+                    <span class="org-keyword">static_cast</span>&lt;<span class="org-type">encoded_type</span>&gt;(<span class="org-keyword">decltype</span>(i)::value));
+            <span class="org-keyword">return</span> [&amp;]&lt;<span class="org-constant">std</span>::<span class="org-type">size_t</span>... <span class="org-variable-name">Is</span>&gt;(<span class="org-constant">std</span>::<span class="org-type">index_sequence</span>&lt;Is...&gt;) {
+                <span class="org-keyword">return</span> <span class="org-constant">std</span>::forward&lt;<span class="org-type">F</span>&gt;(<span class="org-type">f</span>)(
+                    enum_values&lt;Enums{p&lt;Is&gt;(decoded_pair)}...&gt;{});
+            }(<span class="org-constant">std</span>::<span class="org-type">make_index_sequence</span>&lt;<span class="org-keyword">sizeof</span>...(<span class="org-type">Enums</span>)&gt;{});
+        });
+}
+</pre>
+</div>
+
+<p>
+The complete solution is available in <a href="https://godbolt.org/z/eGneqr6jP">Compiler Explorer</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org90101dc" class="outline-2">
+<h2 id="org90101dc">Conclusion</h2>
+<div class="outline-text-2" id="text-org90101dc">
+<p>
+Should this have a conclusion?  This was just me showing off something
+I think is cool.  Using math tricks to solve problems is always cool.
+People claiming that math is not needed for programming do not know
+what they are missing.
+</p>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="creator"><a href="https://www.gnu.org/software/emacs/">Emacs</a> 29.3 (<a href="https://orgmode.org">Org</a> mode 9.6.15)</p>
+</div>
+</body>
+</html>
