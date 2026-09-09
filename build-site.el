@@ -18,10 +18,13 @@
 (require 'ox-publish)
 ;; (require 'org-special-block-extras)
 
+;; TODO: look into https://taingram.org/blog/org-mode-blog.html to add
+;; navigation bars and use a custom CSS instead
+
 ;; Customize the HTML output
 (setq org-html-validation-link nil            ;; Don't show validation link
-      org-html-head-include-scripts nil       ;; Use our own scripts
-      org-html-head-include-default-style nil ;; Use our own styles
+      org-html-head-include-scripts nil       ;; Disable org's html default JS
+      org-html-head-include-default-style nil ;; Disable org's html default CSS
       ;; style: simple css
       ;; org-html-head "<link rel=\"stylesheet\" href=\"https://cdn.simplecss.org/simple.min.css\" />"
       ;; style: gongzhitaao https://github.com/gongzhitaao/orgcss
