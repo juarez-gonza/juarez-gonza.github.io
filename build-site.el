@@ -19,14 +19,22 @@
 ;; (require 'org-special-block-extras)
 
 ;; Customize the HTML output
-(setq org-html-validation-link nil            ;; Don't show validation link
-      org-html-head-include-scripts nil       ;; Disable org's html default JS
+(setq org-html-validation-link nil      ;; Don't show validation link
+      org-html-head-include-scripts nil ;; Disable org's html default JS
       org-html-head-include-default-style nil ;; Disable org's html default CSS
       ;; style: simple css
       ;; org-html-head "<link rel=\"stylesheet\" href=\"https://cdn.simplecss.org/simple.min.css\" />"
       ;; style: gongzhitaao https://github.com/gongzhitaao/orgcss
       org-html-htmlize-output-type 'css ;; needed for gongzhitaao code highlighting
       org-html-head "<link rel=\"stylesheet\" type=\"text/css\" href=\"https://gongzhitaao.org/orgcss/org.css\" />")
+
+;; Enable source code evaluation for dot (used to draw graphs)
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '((dot . t)))
+
+(setq org-export-use-babel t) ;; allow org-export to use babel
+(setq org-confirm-babel-evaluate nil) ;; do not prompt to evaluate
 
 ;; Define the publishing project
 (setq org-publish-project-alist
@@ -41,9 +49,9 @@
              :html-preamble (concat "<div class='topnav'>
                                      <a href='/index.html'>Home</a>
                                      </div>")
-             :with-author nil      ;; Don't include author name
-             :with-creator t       ;; Include Emacs and Org versions in footer
-             :with-toc t           ;; Include a table of contents
+             :with-author nil ;; Don't include author name
+             :with-creator t ;; Include Emacs and Org versions in footer
+             :with-toc t     ;; Include a table of contents
              :section-numbers nil  ;; Don't include section numbers
 	     :time-stamp-file nil) ;; Don't include time stamp in file
 
