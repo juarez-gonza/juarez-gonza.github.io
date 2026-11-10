@@ -21,15 +21,15 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org95dd1b8">Computation and continuations</a>
+<li><a href="#org57a951d">Computation and continuations</a>
 <ul>
-<li><a href="#orgc6bf46a">Example 1: Arithmetic</a></li>
-<li><a href="#orgc172a8a">Example 2: Top to bottom statement execution</a></li>
-<li><a href="#orgefe982f">Example 3: Function calls</a></li>
+<li><a href="#org7cd7678">Example 1: Arithmetic</a></li>
+<li><a href="#orgbf255f2">Example 2: Statements</a></li>
+<li><a href="#orge1d4ef6">Example 3: Function</a></li>
 </ul>
 </li>
-<li><a href="#org0cbf2e5">Continuations and callbacks</a></li>
-<li><a href="#orgd28e85d">From continuations to <code>std::execution</code></a></li>
+<li><a href="#org8b6240c">Continuations and callbacks</a></li>
+<li><a href="#org3df5ec9">From continuations to <code>std::execution</code></a></li>
 </ul>
 </div>
 </div>
@@ -37,14 +37,10 @@
 This post is the first entry in a series dissecting C++
 <code>std::execution</code>: the framework for asynchronous computation proposed
 for standardization.  The main purpose of the series is to develop an
-understanding of the API and its rationale from first principles.
-</p>
-
-
-<p>
-If you have tried to study <code>std::execution</code> before and any of the
-following sentences evoked one (or more) of the first four <a href="https://en.wikipedia.org/wiki/Five_stages_of_grief">stages of
-grief</a>
+understanding of the API and its rationale from first principles.  In
+addition, if you have previously studied <code>std::execution</code> and any of
+the following sentences evoked one (or more) of the first four <a href="https://en.wikipedia.org/wiki/Five_stages_of_grief">stages
+of grief</a>
 </p>
 <ul class="org-ul">
 <li>"Senders represent pending work",</li>
@@ -52,9 +48,8 @@ grief</a>
 <li>"Users rarely need to care about receivers", or</li>
 <li>"<code>let_value</code> is <i>just</i> the bind operator of the Continuation monad",</li>
 </ul>
-
 <p>
-then this series is intended to help you reach acceptance<sup><a id="fnr.1" class="footref" href="#fn.1" role="doc-backlink">1</a></sup>.
+then this series may help you reach the acceptance<sup><a id="fnr.1" class="footref" href="#fn.1" role="doc-backlink">1</a></sup> stage.
 </p>
 
 
@@ -66,90 +61,155 @@ converging to <code>std::execution</code> as proposed for standardization.
 </p>
 
 
-<div id="outline-container-org95dd1b8" class="outline-2">
-<h2 id="org95dd1b8">Computation and continuations</h2>
-<div class="outline-text-2" id="text-org95dd1b8">
+<div id="outline-container-org57a951d" class="outline-2">
+<h2 id="org57a951d">Computation and continuations</h2>
+<div class="outline-text-2" id="text-org57a951d">
 <p>
-Bare with me for a few paragraphs of pseudo-theory.
+We can intuitively define a computation as a process by which some
+inputs are converted into some outputs by executing a set of steps one
+after the other<sup><a id="fnr.2" class="footref" href="#fn.2" role="doc-backlink">2</a></sup>.  We can split the progress of a
+computation being executed by some abstract machine into two pieces:
+already executed steps and to-be-executed steps.  To-be-executed steps
+can be further split into the next <i>immediate</i> step to be executed,
+and the remaining <i>non-immediate</i> steps to be executed.  The former is
+the <b>reducible expression</b> and the latter steps conform the
+<b>continuation</b>.
 </p>
 
 
 <p>
-Without going into a specific theoretical model for computation
-(Turing machines, general recursive functions, lambda calculus, etc.),
-we can intuitively define a computation as a process by which some
-inputs are converted into some outputs by executing a set of <i>steps</i>
-one after the other.  We can split the progress of a computation being
-executed by some abstract machine into two pieces: executed steps and
-to-be-executed steps.  We can further split the to-be-executed steps
-into the next <i>immediate</i> step to be executed, and the remaining, more
-<i>distant</i>, steps to be executed.  The former receives the name of
-<b>reducible expression</b>, the latter conform the <b>continuation</b>.
+The wording of the previous paragraph is intentionally vague.  For
+example, using "instructions" in place of "steps" would be prone to an
+understanding of continuations in terms of CPU instructions, but that
+is not the sole granularity at which one can reason about
+continuations &#x2014; this is part of the strength of continuations.  The
+following examples should clarify these ideas.
+</p>
+</div>
+
+<div id="outline-container-org7cd7678" class="outline-3">
+<h3 id="org7cd7678">Example 1: Arithmetic</h3>
+<div class="outline-text-3" id="text-org7cd7678">
+<p>
+Given the expression <code>1 + 2 * 3</code>, the usual precedence rules tell us
+that the first step to be executed is <code>2 * 3</code>.  That is, <code>2 * 3</code> is
+the reducible expression and <code>1 + ...</code> is the continuation.
 </p>
 
 
 <p>
-This can be further illustrated with some examples.
-</p>
-</div>
-
-<div id="outline-container-orgc6bf46a" class="outline-3">
-<h3 id="orgc6bf46a">Example 1: Arithmetic</h3>
-<div class="outline-text-3" id="text-orgc6bf46a">
-<p>
-Given the expression <code>1 + 2 * 3</code>, the usual precedence rules (to which
-C++ abides) tell us that the first step to be executed is <code>2 * 3</code>.
-That is, <code>2 * 3</code> is the reducible expression and <code>1 + ...</code> is the
-continuation.
+While <code>2 * 3</code> is executed, the result of <code>1 + ...</code> remains
+undetermined.  Computationally, one can think of <code>1 + ...</code> as being
+<i>suspended</i> until the result of <code>2 * 3</code> is available.  Once the result
+is available we "fill" the ellipsis of <code>1 + ...</code> to obtain <code>1 +
+6</code>. This step is often referred to as <i>applying the continuation</i>.
 </p>
 
 
 <p>
-While <code>2 * 3</code> is executed, the result of <code>1 + ...</code> (and, in this case,
-the whole expression) remains undetermined.  Computationally, one can
-think of <code>1 + ...</code> as being <i>suspended</i> until the result of <code>2 * 3</code> is
-available.  Once the result is available we "fill" the ellipsis of
-<code>1 + ...</code> with it to obtain <code>1 + 6</code>. This step is often referred to as
-<b>applying the continuation</b>.
+Finally, <code>1 + 6</code> has one single step to be executed and an empty
+continuation (no non-immediate next steps).  In other words, after
+executing the reducible expression, the computation is <i>done</i>.
 </p>
 
 
 <p>
-Finally, <code>1 + 6</code> has one single step to be executed and no
-continuation (or an empty continuation, if we think of it as a set of
-steps).  This just means that after executing the reducible expression
-the result of the computation is fully determined and there is nothing
-left to do.
+This silly example already shows a key property of continuations: they
+are comprised not solely of operational descriptions (<code>+</code>), but also
+of the data needed to execute these operations once the continuation
+is applied (<code>1</code>).
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbf255f2" class="outline-3">
+<h3 id="orgbf255f2">Example 2: Statements</h3>
+<div class="outline-text-3" id="text-orgbf255f2">
+<p>
+There is no reason to limit continuations to arithmetic expressions,
+we could forward it to top-to-bottom statement execution (or, more
+generally, to the <a href="https://eel.is/c++draft/basic.exec#intro.races-7">happens-before relation</a>).
 </p>
 
 
 <p>
-This may seem like a dumb example, but it already shows something very
-particular of continuations: they are comprised not solely of the set
-of next, non-immediate, steps, but also of the <i>data</i> required to
-perform these steps. This is illustrated in <code>1 + ...</code> containing both
-operation (<code>+</code>) and data (<code>1</code>).
+For example, in
+</p>
+<div class="org-src-container">
+<pre class="src src-C++"><span class="linenr">1: </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = x * x;
+<span class="linenr">2: </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqy</span> = y * y;
+<span class="linenr">3: </span><span class="org-keyword">auto</span> <span class="org-variable-name">r</span> = sqx + sqy;
+</pre>
+</div>
+<p>
+a viable execution has line 1 as its reducible expression and
+statements of lines 2 and 3 conform the continuation.
+</p>
+
+
+<p>
+Notice that the notion of "step" changes drastically between this
+example and the one of arithmetic expressions. In the case of
+arithmetic expressions the steps were executions of <code>+</code> and <code>*</code>.
+Contrast that with the current example, where the step is a whole
+statement (some arithmetic expression and its assignment to a
+variable, but could be more complex than that).  Outside of
+practicality, it does not really matter what level of step granularity
+we decide upon when discussing continuations as long as we are
+consistent.  For example, we could discuss the listing above in terms
+of expressions instead of statements.  One plausible execution has
+<code>x * x</code> as its reducible expression and its continuation is conformed
+by the assignment to <code>sqx</code> and lines 2 and 3.
 </p>
 </div>
 </div>
 
-<div id="outline-container-orgc172a8a" class="outline-3">
-<h3 id="orgc172a8a">Example 2: Top to bottom statement execution</h3>
+
+<div id="outline-container-orge1d4ef6" class="outline-3">
+<h3 id="orge1d4ef6">Example 3: Function</h3>
+<div class="outline-text-3" id="text-orge1d4ef6">
+<p>
+So far none of the examples have function calls in them, but this does
+not have to be the case.  Say we have an execution of <code>hypothenuse</code>
+following the steps denoted by the listing below
+</p>
+<div class="org-src-container">
+<pre class="src src-C++"><span class="linenr">1: </span><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> x * x; }
+<span class="linenr">2: </span><span class="org-type">double</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> x + y; }
+<span class="linenr">3: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+<span class="linenr">4: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = sq(x);
+<span class="linenr">5: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqy</span> = sq(y);
+<span class="linenr">6: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">r</span> = add(sqx, sqy);
+<span class="linenr">7: </span>  <span class="org-keyword">return</span> r;
+<span class="linenr">8: </span>}
+</pre>
+</div>
+<p>
+If <code>sq(x)</code> is the reducible expression, then the continuation is
+conformed by the assignment to <code>sqx</code>, statements of lines 5, 6 and 7,
+and whatever the caller of <code>hypotenuse</code> does after the function
+returns.  Notice that we treated <code>sq(x)</code> as a single step, ignoring
+the complexity of the implementation of <code>sq</code>.
+</p>
+
+
+<p>
+What these examples are stressing is that a continuation is, in
+layman's terms, "whatever remains to be executed" regardless of the
+granularity level at which we decide to operate in.
+</p>
+</div>
+</div>
 </div>
 
-<div id="outline-container-orgefe982f" class="outline-3">
-<h3 id="orgefe982f">Example 3: Function calls</h3>
-</div>
-</div>
-
-<div id="outline-container-org0cbf2e5" class="outline-2">
-<h2 id="org0cbf2e5">Continuations and callbacks</h2>
+<div id="outline-container-org8b6240c" class="outline-2">
+<h2 id="org8b6240c">Continuations and callbacks</h2>
 </div>
 
 
-<div id="outline-container-orgd28e85d" class="outline-2">
-<h2 id="orgd28e85d">From continuations to <code>std::execution</code></h2>
-<div class="outline-text-2" id="text-orgd28e85d">
+<div id="outline-container-org3df5ec9" class="outline-2">
+<h2 id="org3df5ec9">From continuations to <code>std::execution</code></h2>
+<div class="outline-text-2" id="text-org3df5ec9">
 </div>
 </div>
 <div id="footnotes">
@@ -171,6 +231,14 @@ explaining it is lazy at best. Moreover, the model of
 hence <code>let_value</code> is much more than <i>just</i> the bind operator of the
 Continuation monad.</li>
 </ul></div></div>
+
+<div class="footdef"><sup><a id="fn.2" class="footnum" href="#fnr.2" role="doc-backlink">2</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+A more theoretical definition would probably
+involve a model of computation such as Turing machines, general
+recursive functions, or lambda calculus.  But it is not the intention
+of this post to be as precise with these details when the general idea
+can be (almost) entirely captured by simpler terminology.
+</p></div></div>
 
 
 </div>
