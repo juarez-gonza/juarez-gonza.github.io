@@ -1,0 +1,120 @@
+#+title: Exploring C++ =std::execution= 0
+#+author: Gonzalo Juarez
+
+This post is the first entry in a series dissecting C++
+=std::execution=: the framework for asynchronous computation proposed
+for standardization.  The main purpose of the series is to develop an
+understanding of the API and its rationale from first principles.
+
+
+If you have tried to study =std::execution= before and any of the
+following sentences evoked one (or more) of the first four [[https://en.wikipedia.org/wiki/Five_stages_of_grief][stages of
+grief]]
+- "Senders represent pending work",
+- "Senders compose",
+- "Users rarely need to care about receivers", or
+- "=let_value= is /just/ the bind operator of the Continuation monad",
+
+then this series is intended to help you reach acceptance[fn:dislike].
+
+
+[fn:dislike] The reason I dislike the sentences in the bullet points are,
+in order of appearance:
+- What is "work"? Is it measured in Joules? What is "pending"?
+  Potential energy?
+- How is composition defined in sender-land?
+- Not seeing directly in code is /not/ the same as not caring.
+- Waving the Continuation monad around to C++ programmers without
+  explaining it is lazy at best. Moreover, the model of
+  =std::execution= is much more than /just/ the Continuation monad --
+  hence =let_value= is much more than /just/ the bind operator of the
+  Continuation monad.
+
+
+We begin with the bare basics: continuations and the shape of
+computation under a simplified =std::execution= framework.  We will
+add complexity to the framework as the series progresses, slowly
+converging to =std::execution= as proposed for standardization.
+
+
+* Computation and continuations
+
+Bare with me for a few paragraphs of pseudo-theory.
+
+
+Without going into a specific theoretical model for computation
+(Turing machines, general recursive functions, lambda calculus, etc.),
+we can intuitively define a computation as a process by which some
+inputs are converted into some outputs by executing a set of /steps/
+one after the other.  We can split the progress of a computation being
+executed by some abstract machine into two pieces: executed steps and
+to-be-executed steps.  We can further split the to-be-executed steps
+into the next /immediate/ step to be executed, and the remaining, more
+/distant/, steps to be executed.  The former receives the name of
+*reducible expression*, the latter conform the *continuation*.
+
+
+This can be further illustrated with some examples.
+
+** Example 1: Arithmetic
+
+Given the expression =1 + 2 * 3=, the usual precedence rules (to which
+C++ abides) tell us that the first step to be executed is =2 * 3=.
+That is, =2 * 3= is the reducible expression and =1 + ...= is the
+continuation.
+
+
+While =2 * 3= is executed, the result of =1 + ...= (and, in this case,
+the whole expression) remains undetermined.  Computationally, one can
+think of =1 + ...= as being /suspended/ until the result of =2 * 3= is
+available.  Once the result is available we "fill" the ellipsis of
+=1 + ...= with it to obtain =1 + 6=. This step is often referred to as
+*applying the continuation*.
+
+
+Finally, =1 + 6= has one single step to be executed and no
+continuation (or an empty continuation, if we think of it as a set of
+steps).  This just means that after executing the reducible expression
+the result of the computation is fully determined and there is nothing
+left to do.
+
+
+This may seem like a dumb example, but it already shows something very
+particular of continuations: they are comprised not solely of the set
+of next, non-immediate, steps, but also of the /data/ required to
+perform these steps. This is illustrated in =1 + ...= containing both
+operation (=+=) and data (=1=).
+
+** Example 2: Top to bottom statement execution
+
+** Example 3: Function calls
+
+* Continuations and callbacks
+
+
+* From continuations to =std::execution=
+
+
+# #+BEGIN_EXPORT html
+# <div style="text-align: center;">
+# #+END_EXPORT
+# #+BEGIN_SRC dot :file images/my_output_file.png :cmdline -Kdot -Tpng :exports results
+#   digraph G {
+#     rankdir=LR;
+#     initial [shape=point, width=0.15, label=""];
+#     initial -> A;
+#     A -> B -> C;
+#     A -> D;
+#     A -> A;
+#     D -> E;
+#     C -> E;
+#     {
+#       rank=same;
+#       B;
+#       D;
+#     }
+#   }
+# #+END_SRC
+# #+BEGIN_EXPORT html
+# </div>
+# #+END_EXPORT
