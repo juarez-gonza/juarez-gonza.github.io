@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Exploring C++ =std::execution= 0</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="https://gongzhitaao.org/orgcss/org.css" />
+</head>
+<body>
+<div id="preamble" class="status">
+<div class='topnav'>
+                                     <a href='/index.html'>Home</a>
+                                     </div>
+</div>
+<div id="content" class="content">
+<h1 class="title">Exploring C++ <code>std::execution</code> 0</h1>
+<div id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org95dd1b8">Computation and continuations</a>
+<ul>
+<li><a href="#orgc6bf46a">Example 1: Arithmetic</a></li>
+<li><a href="#orgc172a8a">Example 2: Top to bottom statement execution</a></li>
+<li><a href="#orgefe982f">Example 3: Function calls</a></li>
+</ul>
+</li>
+<li><a href="#org0cbf2e5">Continuations and callbacks</a></li>
+<li><a href="#orgd28e85d">From continuations to <code>std::execution</code></a></li>
+</ul>
+</div>
+</div>
+<p>
+This post is the first entry in a series dissecting C++
+<code>std::execution</code>: the framework for asynchronous computation proposed
+for standardization.  The main purpose of the series is to develop an
+understanding of the API and its rationale from first principles.
+</p>
+
+
+<p>
+If you have tried to study <code>std::execution</code> before and any of the
+following sentences evoked one (or more) of the first four <a href="https://en.wikipedia.org/wiki/Five_stages_of_grief">stages of
+grief</a>
+</p>
+<ul class="org-ul">
+<li>"Senders represent pending work",</li>
+<li>"Senders compose",</li>
+<li>"Users rarely need to care about receivers", or</li>
+<li>"<code>let_value</code> is <i>just</i> the bind operator of the Continuation monad",</li>
+</ul>
+
+<p>
+then this series is intended to help you reach acceptance<sup><a id="fnr.1" class="footref" href="#fn.1" role="doc-backlink">1</a></sup>.
+</p>
+
+
+<p>
+We begin with the bare basics: continuations and the shape of
+computation under a simplified <code>std::execution</code> framework.  We will
+add complexity to the framework as the series progresses, slowly
+converging to <code>std::execution</code> as proposed for standardization.
+</p>
+
+
+<div id="outline-container-org95dd1b8" class="outline-2">
+<h2 id="org95dd1b8">Computation and continuations</h2>
+<div class="outline-text-2" id="text-org95dd1b8">
+<p>
+Bare with me for a few paragraphs of pseudo-theory.
+</p>
+
+
+<p>
+Without going into a specific theoretical model for computation
+(Turing machines, general recursive functions, lambda calculus, etc.),
+we can intuitively define a computation as a process by which some
+inputs are converted into some outputs by executing a set of <i>steps</i>
+one after the other.  We can split the progress of a computation being
+executed by some abstract machine into two pieces: executed steps and
+to-be-executed steps.  We can further split the to-be-executed steps
+into the next <i>immediate</i> step to be executed, and the remaining, more
+<i>distant</i>, steps to be executed.  The former receives the name of
+<b>reducible expression</b>, the latter conform the <b>continuation</b>.
+</p>
+
+
+<p>
+This can be further illustrated with some examples.
+</p>
+</div>
+
+<div id="outline-container-orgc6bf46a" class="outline-3">
+<h3 id="orgc6bf46a">Example 1: Arithmetic</h3>
+<div class="outline-text-3" id="text-orgc6bf46a">
+<p>
+Given the expression <code>1 + 2 * 3</code>, the usual precedence rules (to which
+C++ abides) tell us that the first step to be executed is <code>2 * 3</code>.
+That is, <code>2 * 3</code> is the reducible expression and <code>1 + ...</code> is the
+continuation.
+</p>
+
+
+<p>
+While <code>2 * 3</code> is executed, the result of <code>1 + ...</code> (and, in this case,
+the whole expression) remains undetermined.  Computationally, one can
+think of <code>1 + ...</code> as being <i>suspended</i> until the result of <code>2 * 3</code> is
+available.  Once the result is available we "fill" the ellipsis of
+<code>1 + ...</code> with it to obtain <code>1 + 6</code>. This step is often referred to as
+<b>applying the continuation</b>.
+</p>
+
+
+<p>
+Finally, <code>1 + 6</code> has one single step to be executed and no
+continuation (or an empty continuation, if we think of it as a set of
+steps).  This just means that after executing the reducible expression
+the result of the computation is fully determined and there is nothing
+left to do.
+</p>
+
+
+<p>
+This may seem like a dumb example, but it already shows something very
+particular of continuations: they are comprised not solely of the set
+of next, non-immediate, steps, but also of the <i>data</i> required to
+perform these steps. This is illustrated in <code>1 + ...</code> containing both
+operation (<code>+</code>) and data (<code>1</code>).
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc172a8a" class="outline-3">
+<h3 id="orgc172a8a">Example 2: Top to bottom statement execution</h3>
+</div>
+
+<div id="outline-container-orgefe982f" class="outline-3">
+<h3 id="orgefe982f">Example 3: Function calls</h3>
+</div>
+</div>
+
+<div id="outline-container-org0cbf2e5" class="outline-2">
+<h2 id="org0cbf2e5">Continuations and callbacks</h2>
+</div>
+
+
+<div id="outline-container-orgd28e85d" class="outline-2">
+<h2 id="orgd28e85d">From continuations to <code>std::execution</code></h2>
+<div class="outline-text-2" id="text-orgd28e85d">
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" class="footnum" href="#fnr.1" role="doc-backlink">1</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+The reason I dislike the sentences in the bullet points are,
+in order of appearance:
+</p>
+<ul class="org-ul">
+<li>What is "work"? Is it measured in Joules? What is "pending"?
+Potential energy?</li>
+<li>How is composition defined in sender-land?</li>
+<li>Not seeing directly in code is <i>not</i> the same as not caring.</li>
+<li>Waving the Continuation monad around to C++ programmers without
+explaining it is lazy at best. Moreover, the model of
+<code>std::execution</code> is much more than <i>just</i> the Continuation monad &#x2013;
+hence <code>let_value</code> is much more than <i>just</i> the bind operator of the
+Continuation monad.</li>
+</ul></div></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="creator"><a href="https://www.gnu.org/software/emacs/">Emacs</a> 29.3 (<a href="https://orgmode.org">Org</a> mode 9.6.15)</p>
+</div>
+</body>
+</html>
