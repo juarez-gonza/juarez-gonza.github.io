@@ -21,26 +21,31 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org57a951d">Computation and continuations</a>
+<li><a href="#orgeb88e46">Computation and continuations</a>
 <ul>
-<li><a href="#org7cd7678">Example 1: Arithmetic</a></li>
-<li><a href="#orgbf255f2">Example 2: Statements</a></li>
-<li><a href="#orge1d4ef6">Example 3: Function</a></li>
+<li><a href="#org7d2d6ad">Example 1: Arithmetic expressions</a></li>
+<li><a href="#org38ee546">Example 2: Subsequent statements</a></li>
+<li><a href="#org5b564bf">Example 3: Function boundaries</a></li>
+<li><a href="#orgf2e5be9">Example 4: Conditional branches</a></li>
 </ul>
 </li>
-<li><a href="#org8b6240c">Continuations and callbacks</a></li>
-<li><a href="#org3df5ec9">From continuations to <code>std::execution</code></a></li>
+<li><a href="#org38d6ccf">Continuation Passing Style</a>
+<ul>
+<li><a href="#org71e7d0a">What about <code>main</code></a></li>
+</ul>
+</li>
+<li><a href="#orgfa5bab4">From CPS to <code>std::execution</code></a></li>
 </ul>
 </div>
 </div>
 <p>
-This post is the first entry in a series dissecting C++
+This post is the first entry in a series of posts dissecting C++
 <code>std::execution</code>: the framework for asynchronous computation proposed
 for standardization.  The main purpose of the series is to develop an
-understanding of the API and its rationale from first principles.  In
-addition, if you have previously studied <code>std::execution</code> and any of
-the following sentences evoked one (or more) of the first four <a href="https://en.wikipedia.org/wiki/Five_stages_of_grief">stages
-of grief</a>
+understanding of <code>std::execution</code>'s API and (my understanding of) the
+rationale behind it from first principles.  Additionally, those who
+have already studied <code>std::execution</code> and found themselves in one of
+the first four <a href="https://en.wikipedia.org/wiki/Five_stages_of_grief">stages of grief</a> when analyzing the meaning of
 </p>
 <ul class="org-ul">
 <li>"Senders represent pending work",</li>
@@ -49,47 +54,51 @@ of grief</a>
 <li>"<code>let_value</code> is <i>just</i> the bind operator of the Continuation monad",</li>
 </ul>
 <p>
-then this series may help you reach the acceptance<sup><a id="fnr.1" class="footref" href="#fn.1" role="doc-backlink">1</a></sup> stage.
+may find this series useful to reach the acceptance<sup><a id="fnr.1" class="footref" href="#fn.1" role="doc-backlink">1</a></sup> stage.
 </p>
 
 
 <p>
-We begin with the bare basics: continuations and the shape of
+We begin with the bare basics: continuations and the structure of
 computation under a simplified <code>std::execution</code> framework.  We will
 add complexity to the framework as the series progresses, slowly
 converging to <code>std::execution</code> as proposed for standardization.
 </p>
 
 
-<div id="outline-container-org57a951d" class="outline-2">
-<h2 id="org57a951d">Computation and continuations</h2>
-<div class="outline-text-2" id="text-org57a951d">
+<div id="outline-container-orgeb88e46" class="outline-2">
+<h2 id="orgeb88e46">Computation and continuations</h2>
+<div class="outline-text-2" id="text-orgeb88e46">
 <p>
-We can intuitively define a computation as a process by which some
+A computation can be intuitively defined as a process by which some
 inputs are converted into some outputs by executing a set of steps one
-after the other<sup><a id="fnr.2" class="footref" href="#fn.2" role="doc-backlink">2</a></sup>.  We can split the progress of a
-computation being executed by some abstract machine into two pieces:
-already executed steps and to-be-executed steps.  To-be-executed steps
-can be further split into the next <i>immediate</i> step to be executed,
-and the remaining <i>non-immediate</i> steps to be executed.  The former is
-the <b>reducible expression</b> and the latter steps conform the
-<b>continuation</b>.
+after the other<sup><a id="fnr.2" class="footref" href="#fn.2" role="doc-backlink">2</a></sup>.  At any given time, the execution
+state of a computation can be subdivided into two: already executed
+steps and to-be-executed steps.  To-be-executed steps can be further
+subdivided into the next <i>immediate</i> step to be executed, and the
+remaining <i>non-immediate</i> steps to be executed.  The former step is
+known as the <b>reducible expression</b> and the latter steps conform what
+is referred to as the <b>continuation</b>.
 </p>
 
 
 <p>
-The wording of the previous paragraph is intentionally vague.  For
-example, using "instructions" in place of "steps" would be prone to an
-understanding of continuations in terms of CPU instructions, but that
-is not the sole granularity at which one can reason about
-continuations &#x2014; this is part of the strength of continuations.  The
-following examples should clarify these ideas.
+The wording of the previous paragraph is intentionally vague.  This is
+to prevent its understanding in terms that are too concrete for the
+level of reasoning we are aiming for.  If in place of "steps" the
+paragraph used "instructions", we could easily (mis)understand
+reducible expressions and continuations to be defined in terms of CPU
+instructions.  While CPU instructions could be thought of as steps,
+they are far from the only <i>granularity level</i> at which we would like
+to apply these ideas.  The following examples should clarify the
+situation.
 </p>
 </div>
 
-<div id="outline-container-org7cd7678" class="outline-3">
-<h3 id="org7cd7678">Example 1: Arithmetic</h3>
-<div class="outline-text-3" id="text-org7cd7678">
+
+<div id="outline-container-org7d2d6ad" class="outline-3">
+<h3 id="org7d2d6ad">Example 1: Arithmetic expressions</h3>
+<div class="outline-text-3" id="text-org7d2d6ad">
 <p>
 Given the expression <code>1 + 2 * 3</code>, the usual precedence rules tell us
 that the first step to be executed is <code>2 * 3</code>.  That is, <code>2 * 3</code> is
@@ -99,17 +108,18 @@ the reducible expression and <code>1 + ...</code> is the continuation.
 
 <p>
 While <code>2 * 3</code> is executed, the result of <code>1 + ...</code> remains
-undetermined.  Computationally, one can think of <code>1 + ...</code> as being
-<i>suspended</i> until the result of <code>2 * 3</code> is available.  Once the result
-is available we "fill" the ellipsis of <code>1 + ...</code> to obtain <code>1 +
-6</code>. This step is often referred to as <i>applying the continuation</i>.
+undetermined.  We can think of <code>1 + ...</code> as being <i>suspended</i> until
+the result of <code>2 * 3</code> is available.  Once the result is available we
+"fill" the ellipsis of <code>1 + ...</code> to obtain <code>1 + 6</code>. We will refer to
+this "filling" as <i>applying the continuation</i>.
 </p>
 
 
 <p>
-Finally, <code>1 + 6</code> has one single step to be executed and an empty
-continuation (no non-immediate next steps).  In other words, after
-executing the reducible expression, the computation is <i>done</i>.
+The expression we were left with, <code>1 + 6</code>, has one single step to be
+executed and an empty continuation (no non-immediate next steps).  In
+other words, after executing the reducible expression, the computation
+is <i>done</i>.
 </p>
 
 
@@ -122,18 +132,19 @@ is applied (<code>1</code>).
 </div>
 </div>
 
-<div id="outline-container-orgbf255f2" class="outline-3">
-<h3 id="orgbf255f2">Example 2: Statements</h3>
-<div class="outline-text-3" id="text-orgbf255f2">
+<div id="outline-container-org38ee546" class="outline-3">
+<h3 id="org38ee546">Example 2: Subsequent statements</h3>
+<div class="outline-text-3" id="text-org38ee546">
 <p>
-There is no reason to limit continuations to arithmetic expressions,
-we could forward it to top-to-bottom statement execution (or, more
-generally, to the <a href="https://eel.is/c++draft/basic.exec#intro.races-7">happens-before relation</a>).
+There is no reason to limit our understanding of steps of a
+computation to arithmetic expressions.  We could understand steps to
+be statements, and the order of execution would be the usual
+top-to-bottom statement execution.
 </p>
 
 
 <p>
-For example, in
+Consider
 </p>
 <div class="org-src-container">
 <pre class="src src-C++"><span class="linenr">1: </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = x * x;
@@ -142,74 +153,226 @@ For example, in
 </pre>
 </div>
 <p>
-a viable execution has line 1 as its reducible expression and
+A valid execution state has line 1 as its reducible expression and
 statements of lines 2 and 3 conform the continuation.
 </p>
 
 
 <p>
-Notice that the notion of "step" changes drastically between this
-example and the one of arithmetic expressions. In the case of
-arithmetic expressions the steps were executions of <code>+</code> and <code>*</code>.
-Contrast that with the current example, where the step is a whole
-statement (some arithmetic expression and its assignment to a
-variable, but could be more complex than that).  Outside of
-practicality, it does not really matter what level of step granularity
-we decide upon when discussing continuations as long as we are
-consistent.  For example, we could discuss the listing above in terms
-of expressions instead of statements.  One plausible execution has
-<code>x * x</code> as its reducible expression and its continuation is conformed
-by the assignment to <code>sqx</code> and lines 2 and 3.
+Disregarding practicality, it does not really matter how granular a
+step is when discussing continuations as long as we are consistent.
 </p>
 </div>
 </div>
 
-
-<div id="outline-container-orge1d4ef6" class="outline-3">
-<h3 id="orge1d4ef6">Example 3: Function</h3>
-<div class="outline-text-3" id="text-orge1d4ef6">
+<div id="outline-container-org5b564bf" class="outline-3">
+<h3 id="org5b564bf">Example 3: Function boundaries</h3>
+<div class="outline-text-3" id="text-org5b564bf">
 <p>
 So far none of the examples have function calls in them, but this does
-not have to be the case.  Say we have an execution of <code>hypothenuse</code>
-following the steps denoted by the listing below
+not have to be the case.  Given the function <code>hypotenuse</code> as defined
+below
 </p>
 <div class="org-src-container">
-<pre class="src src-C++"><span class="linenr">1: </span><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> x * x; }
-<span class="linenr">2: </span><span class="org-type">double</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> x + y; }
-<span class="linenr">3: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
-<span class="linenr">4: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = sq(x);
-<span class="linenr">5: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqy</span> = sq(y);
-<span class="linenr">6: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">r</span> = add(sqx, sqy);
-<span class="linenr">7: </span>  <span class="org-keyword">return</span> r;
-<span class="linenr">8: </span>}
+<pre class="src src-C++"><span class="linenr">1: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+<span class="linenr">2: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = sq(x);
+<span class="linenr">3: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqy</span> = sq(y);
+<span class="linenr">4: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">r</span> = add(sqx, sqy);
+<span class="linenr">5: </span>  <span class="org-keyword">return</span> sqrt(r);
+<span class="linenr">6: </span>}
 </pre>
 </div>
 <p>
-If <code>sq(x)</code> is the reducible expression, then the continuation is
-conformed by the assignment to <code>sqx</code>, statements of lines 5, 6 and 7,
-and whatever the caller of <code>hypotenuse</code> does after the function
-returns.  Notice that we treated <code>sq(x)</code> as a single step, ignoring
-the complexity of the implementation of <code>sq</code>.
+if <code>sq(x)</code> is the reducible expression of the execution state being
+considered, then the continuation is conformed by the assignment to
+<code>sqx</code>, statements of lines 5, 6 and 7, and whatever the caller of
+<code>hypotenuse</code> does after <code>hypotenuse</code> returns.  Notice that we treated
+<code>sq(x)</code> as a single step, ignoring the complexity of the
+implementation of <code>sq</code>.
 </p>
 
 
 <p>
-What these examples are stressing is that a continuation is, in
-layman's terms, "whatever remains to be executed" regardless of the
+The examples so far are stressing the idea that a continuation is
+"whatever remains to be executed".  This holds regardless of the
 granularity level at which we decide to operate in.
+</p>
+
+
+<p>
+The final example focuses on other relevant properties of
+continuations.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf2e5be9" class="outline-3">
+<h3 id="orgf2e5be9">Example 4: Conditional branches</h3>
+<div class="outline-text-3" id="text-orgf2e5be9">
+<p>
+<a id="org63735a6"></a>
+</p>
+
+<p>
+Consider the code listing below, what is the continuation when line
+<code>1</code> is the reducible expression?  Is it necessary to know the result
+of <code>rand() % 2</code> to determine the continuation?
+</p>
+<div class="org-src-container">
+<pre class="src src-C++"><span class="linenr">1: </span><span class="org-keyword">if</span> (rand() % 2) {
+<span class="linenr">2: </span>  <span class="org-keyword">return</span> foo();
+<span class="linenr">3: </span>} <span class="org-keyword">else</span> {
+<span class="linenr">4: </span>  <span class="org-keyword">return</span> bar();
+<span class="linenr">5: </span>}
+</pre>
+</div>
+<p>
+This is a tricky question.  There is no such thing as <i>the</i>
+continuation at this point in the execution, but rather two (!)
+continuations.  After evaluating the conditional, one continuation is
+<i>discarded</i> and the other one is applied.
+</p>
+
+
+<p>
+This example illustrates three more properties of continuations: (1)
+there is not necessarily one continuation at any given time; (2)
+continuations do not have to be applied, they can be discarded; and
+(3) a continuation may be applied or discarded based on runtime
+information.
 </p>
 </div>
 </div>
 </div>
 
-<div id="outline-container-org8b6240c" class="outline-2">
-<h2 id="org8b6240c">Continuations and callbacks</h2>
+
+<div id="outline-container-org38d6ccf" class="outline-2">
+<h2 id="org38d6ccf">Continuation Passing Style</h2>
+<div class="outline-text-2" id="text-org38d6ccf">
+<p>
+Continuations as shown in the examples so far are not very
+interesting.  We have identified them as part of the structure of
+execution state, but we cannot really <i>do</i> anything with them.
+</p>
+
+
+<p>
+The issue here is that C++ has no language construct that allows us to
+treat continuations as any other kind of object in the language (some
+languages do have such a construct, see <a href="https://scholarworks.iu.edu/dspace/items/52d1b603-67cd-4ba8-afbb-645cfdaa4f74/full">call/cc in Scheme</a>).  What we
+do have in C++ are function objects which can be passed around as
+arguments to functions &#x2013; this is made easier by the existence of
+lambdas.  So what we are going to do is the following
+</p>
+
+<ol class="org-ol">
+<li>Start from the beginning of the program</li>
+<li>Recognize the reducible expression and its continuation.</li>
+<li>Replace the reducible expression by a function that
+<ol class="org-ol">
+<li>Takes the arguments needed to execute the reducible expression.</li>
+<li>Takes one extra argument per continuation, which are function objects.</li>
+<li>Returns the result of applying one of the arguments
+added by step 3.2 to the reducible expression.</li>
+</ol></li>
+<li>Invoke this new function with the required arguments and as many
+lambdas as continuations.  The body of these lambdas correspond to
+the steps of the continuation to which they are associated.</li>
+<li>For each non-empty lambda created in step 4, repeat the process
+from step 2 starting from the reducible expression of an execution
+that begins at the first statement of the lambda.</li>
+</ol>
+
+<p>
+To illustrate, applying this process to
+</p>
+
+<div class="org-src-container">
+<pre class="src src-C++"><span class="linenr">1: </span><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> x * x; }
+<span class="linenr">2: </span><span class="org-type">double</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> x + y; }
+<span class="linenr">3: </span><span class="org-type">double</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> sqrt(x); }
+<span class="linenr">4: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+<span class="linenr">5: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = sq(x);
+<span class="linenr">6: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqy</span> = sq(y);
+<span class="linenr">7: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">r</span> = add(sqx, sqy);
+<span class="linenr">8: </span>  <span class="org-keyword">return</span> sqr(r);
+<span class="linenr">9: </span>}
+</pre>
 </div>
 
+<p>
+yields
+</p>
 
-<div id="outline-container-org3df5ec9" class="outline-2">
-<h2 id="org3df5ec9">From continuations to <code>std::execution</code></h2>
-<div class="outline-text-2" id="text-org3df5ec9">
+<div class="org-src-container">
+<pre class="src src-C++"><span class="linenr"> 1: </span><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }
+<span class="linenr"> 2: </span><span class="org-type">double</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x + y); }
+<span class="linenr"> 3: </span><span class="org-type">double</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(sqrt(x)); }
+<span class="linenr"> 4: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
+<span class="linenr"> 5: </span>  <span class="org-keyword">return</span> sq(x, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) {
+<span class="linenr"> 6: </span>    <span class="org-keyword">return</span> sq(y, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqy</span>) {
+<span class="linenr"> 7: </span>      <span class="org-keyword">return</span> add(sqx, sqy, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">r</span>) {
+<span class="linenr"> 8: </span>        <span class="org-keyword">return</span> sqr(r, cc);
+<span class="linenr"> 9: </span>      });
+<span class="linenr">10: </span>    });
+<span class="linenr">11: </span>  });
+<span class="linenr">12: </span>}
+</pre>
+</div>
+
+<p>
+If we bare with the ugliness of the resulting code for a second, we
+can notice that this process has effectively given us a way to deal
+with continuations as first-class objects, referred to as <b>callbacks</b>.
+The technique that enables this is called <b>Continuation Passing Style</b>
+(CPS) and the algorithm described above is the <b>CPS transform</b>.
+</p>
+
+
+<p>
+Having the continuation as an object allows us to store it (for
+example, in a queue).  Of course usually one does not perform all this
+callback ritual for silly arithmetic expressions, but rather when the
+reducible expression is resolved asynchronously. In such cases, it is
+beneficial to place the continuation in a data structure (queue) so
+that the program can do other stuff while it waits for the completion
+of the reducible expression to be signaled in some form.
+</p>
+</div>
+
+<div id="outline-container-org71e7d0a" class="outline-3">
+<h3 id="org71e7d0a">What about <code>main</code></h3>
+<div class="outline-text-3" id="text-org71e7d0a">
+<p>
+In our ideal CPS world, everything in a program that is written in CPS
+style takes these callback arguments (there can be more than one
+callback, see <a href="#org63735a6">No description for this link</a> and apply the CPS transform).  But
+most of us have to deal with <code>main</code> being the entry point of our
+programs.  The signature of <code>main</code> cannot be modified, putting it at
+odds with our idealized CPS world.  The solution is simple: <code>main</code>
+acts as a barrier between the CPS world and the old world.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-C++"><span class="org-type">void</span> <span class="org-function-name">main</span>() {
+  <span class="org-constant">std</span>::<span class="org-type">optional</span>&lt;<span class="org-type">double</span>&gt; <span class="org-variable-name">result</span>;
+  hypotenuse(2.0, 3.0, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">res</span>) { result = res; });
+  <span class="org-constant">std</span>::println(<span class="org-string">"{}"</span>, *result);
+}
+</pre>
+</div>
+
+<p>
+Breaking the ideal CPS world feels a bit dirty.  This is C++, we are
+used to this feeling.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgfa5bab4" class="outline-2">
+<h2 id="orgfa5bab4">From CPS to <code>std::execution</code></h2>
+<div class="outline-text-2" id="text-orgfa5bab4">
 </div>
 </div>
 <div id="footnotes">
@@ -233,11 +396,11 @@ Continuation monad.</li>
 </ul></div></div>
 
 <div class="footdef"><sup><a id="fn.2" class="footnum" href="#fnr.2" role="doc-backlink">2</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
-A more theoretical definition would probably
-involve a model of computation such as Turing machines, general
-recursive functions, or lambda calculus.  But it is not the intention
-of this post to be as precise with these details when the general idea
-can be (almost) entirely captured by simpler terminology.
+A more theoretical definition would involve a
+model of computation such as Turing machines, general recursive
+functions, or lambda calculus.  But it is not the intention of this
+post to be as precise with these details when the general idea can be
+(almost) entirely captured by simpler terminology.
 </p></div></div>
 
 
