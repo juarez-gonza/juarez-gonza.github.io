@@ -141,6 +141,7 @@ The final example focuses on other relevant properties of
 continuations.
 
 ** Example 4: Conditional branches
+<<conditional-branches>>
 
 Consider the code listing below, what is the continuation when line
 =1= is the reducible expression?  Is it necessary to know the result
@@ -160,12 +161,106 @@ continuations.  After evaluating the conditional, one continuation is
 
 This example illustrates three more properties of continuations: (1)
 there is not necessarily one continuation at any given time; (2)
-continuations do not have to be applied -- they can be discarded; and
+continuations do not have to be applied, they can be discarded; and
 (3) a continuation may be applied or discarded based on runtime
 information.
 
+
 * Continuation Passing Style
 
+
+Continuations as shown in the examples so far are not very
+interesting.  We have identified them as part of the structure of
+execution state, but we cannot really /do/ anything with them.
+
+
+The issue here is that C++ has no language construct that allows us to
+treat continuations as any other kind of object in the language (some
+languages do have such a construct, see [[https://scholarworks.iu.edu/dspace/items/52d1b603-67cd-4ba8-afbb-645cfdaa4f74/full][call/cc in Scheme]]).  What we
+do have in C++ are function objects which can be passed around as
+arguments to functions -- this is made easier by the existence of
+lambdas.  So what we are going to do is the following
+
+1. Start from the beginning of the program
+2. Recognize the reducible expression and its continuation.
+3. Replace the reducible expression by a function that
+   1. Takes the arguments needed to execute the reducible expression.
+   2. Takes one extra argument per continuation, which are function objects.
+   3. Returns the result of applying one of the arguments
+      added by step 3.2 to the reducible expression.
+4. Invoke this new function with the required arguments and as many
+   lambdas as continuations.  The body of these lambdas correspond to
+   the steps of the continuation to which they are associated.
+5. For each non-empty lambda created in step 4, repeat the process
+   from step 2 starting from the reducible expression of an execution
+   that begins at the first statement of the lambda.
+
+To illustrate, applying this process to
+
+#+BEGIN_SRC C++ -n
+double sq(double x) { return x * x; }
+double add(double x, double y) { return x + y; }
+double sqr(double x) { return sqrt(x); }
+double hypotenuse(double x, double y) {
+  auto sqx = sq(x);
+  auto sqy = sq(y);
+  auto r = add(sqx, sqy);
+  return sqr(r);
+}
+#+END_SRC
+
+yields
+
+#+BEGIN_SRC C++ -n
+double sq(double x, auto cc) { return cc(x * x); }
+double add(double x, double y, auto cc) { return cc(x + y); }
+double sqr(double x, auto cc) { return cc(sqrt(x)); }
+double hypotenuse(double x, double y, auto cc) {
+  return sq(x, [&](double sqx) {
+    return sq(y, [&](double sqy) {
+      return add(sqx, sqy, [&](double r) {
+        return sqr(r, cc);
+      });
+    });
+  });
+}
+#+END_SRC
+
+If we bare with the ugliness of the resulting code for a second, we
+can notice that this process has effectively given us a way to deal
+with continuations as first-class objects, referred to as *callbacks*.
+The technique that enables this is called *Continuation Passing Style*
+(CPS) and the algorithm described above is the *CPS transform*.
+
+
+Having the continuation as an object allows us to store it (for
+example, in a queue).  Of course usually one does not perform all this
+callback ritual for silly arithmetic expressions, but rather when the
+reducible expression is resolved asynchronously. In such cases, it is
+beneficial to place the continuation in a data structure (queue) so
+that the program can do other stuff while it waits for the completion
+of the reducible expression to be signaled in some form.
+
+** What about =main=
+
+In our ideal CPS world, everything in a program that is written in CPS
+style takes these callback arguments (there can be more than one
+callback, see [[conditional-branches]] and apply the CPS transform).  But
+most of us have to deal with =main= being the entry point of our
+programs.  The signature of =main= cannot be modified, putting it at
+odds with our idealized CPS world.  The solution is simple: =main=
+acts as a barrier between the CPS world and the old world.
+
+#+BEGIN_SRC C++
+void main() {
+  std::optional<double> result;
+  hypotenuse(2.0, 3.0, [&](double res) { result = res; });
+  std::println("{}", *result);
+}
+#+END_SRC
+
+Breaking the ideal CPS world feels a bit dirty.  This is C++, we are
+used to this feeling.
 
 * From CPS to =std::execution=
 
