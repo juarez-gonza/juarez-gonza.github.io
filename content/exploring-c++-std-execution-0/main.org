@@ -3,11 +3,11 @@
 
 This post is the first entry in a series dissecting C++
 =std::execution=: the framework for asynchronous computation proposed
-for standardization.  The main purpose of the series is to develop an
-understanding of the API and its rationale from first principles.  In
-addition, if you have previously studied =std::execution= and any of
-the following sentences evoked one (or more) of the first four [[https://en.wikipedia.org/wiki/Five_stages_of_grief][stages
-of grief]]
+for standardization.  The main purpose of this series is to develop an
+understanding of =std::execution='s API and the rationale behind it
+from first principles.  In addition, if you have previously studied
+=std::execution= and any of the following sentences evoked one (or
+more) of the first four [[https://en.wikipedia.org/wiki/Five_stages_of_grief][stages of grief]]
 - "Senders represent pending work",
 - "Senders compose",
 - "Users rarely need to care about receivers", or
@@ -42,8 +42,8 @@ after the other[fn:computation-model].  We can split the progress of a
 computation being executed by some abstract machine into two pieces:
 already executed steps and to-be-executed steps.  To-be-executed steps
 can be further split into the next /immediate/ step to be executed,
-and the remaining /non-immediate/ steps to be executed.  The former is
-the *reducible expression* and the latter steps conform the
+and the remaining /non-immediate/ steps to be executed.  The former
+step is the *reducible expression* and the latter steps conform the
 *continuation*.
 
 
@@ -54,12 +54,16 @@ of this post to be as precise with these details when the general idea
 can be (almost) entirely captured by simpler terminology.
 
 
-The wording of the previous paragraph is intentionally vague.  For
-example, using "instructions" in place of "steps" would be prone to an
-understanding of continuations in terms of CPU instructions, but that
-is not the sole granularity at which one can reason about
-continuations --- this is part of the strength of continuations.  The
-following examples should clarify these ideas.
+The wording of the previous paragraph is intentionally vague.  This is
+to prevent its understanding in terms that are too concrete for the
+level of reasoning we are aiming for.  If in place of "steps" the
+paragraph used "instructions", we could easily (mis)understand
+reducible expressions and continuations to be defined in terms of CPU
+instructions.  While CPU instructions could be thought of as steps,
+they are far from the only /granularity level/ at which we would like
+to apply these ideas.  The following examples should clarify the
+situation.
+
 
 ** Example 1: Arithmetic
 
@@ -69,10 +73,10 @@ the reducible expression and =1 + ...= is the continuation.
 
 
 While =2 * 3= is executed, the result of =1 + ...= remains
-undetermined.  Computationally, one can think of =1 + ...= as being
-/suspended/ until the result of =2 * 3= is available.  Once the result
-is available we "fill" the ellipsis of =1 + ...= to obtain =1 +
-6=. This step is often referred to as /applying the continuation/.
+undetermined.  We can think of =1 + ...= as being /suspended/ until
+the result of =2 * 3= is available.  Once the result is available we
+"fill" the ellipsis of =1 + ...= to obtain =1 + 6=. We will refer to
+this "filling" as /applying the continuation/.
 
 
 Finally, =1 + 6= has one single step to be executed and an empty
@@ -87,43 +91,31 @@ is applied (=1=).
 
 ** Example 2: Statements
 
-There is no reason to limit continuations to arithmetic expressions,
-we could forward it to top-to-bottom statement execution (or, more
-generally, to the [[https://eel.is/c++draft/basic.exec#intro.races-7][happens-before relation]]).
+There is no reason to limit our understanding of steps of a
+computation to arithmetic expressions.  We could understand steps to
+be statements, and the order of execution would be the usual
+top-to-bottom statement execution.
 
 
-For example, in
+Consider
 #+BEGIN_SRC C++ -n
   auto sqx = x * x;
   auto sqy = y * y;
   auto r = sqx + sqy;
 #+END_SRC
-a viable execution has line 1 as its reducible expression and
+A viable execution has line 1 as its reducible expression and
 statements of lines 2 and 3 conform the continuation.
 
-
-Notice that the notion of "step" changes drastically between this
-example and the one of arithmetic expressions. In the case of
-arithmetic expressions the steps were executions of =+= and =*=.
-Contrast that with the current example, where the step is a whole
-statement (some arithmetic expression and its assignment to a
-variable, but could be more complex than that).  Outside of
-practicality, it does not really matter what level of step granularity
-we decide upon when discussing continuations as long as we are
-consistent.  For example, we could discuss the listing above in terms
-of expressions instead of statements.  One plausible execution has
-=x * x= as its reducible expression and its continuation is conformed
-by the assignment to =sqx= and lines 2 and 3.
-
+Outside of practicality, it does not really matter what level of step
+granularity we use when discussing continuations as long as we are
+consistent.
 
 ** Example 3: Function
 
 So far none of the examples have function calls in them, but this does
-not have to be the case.  Say we have an execution of =hypothenuse=
-following the steps denoted by the listing below
+not have to be the case.  Given the function =hypotenuse= as defined
+below
 #+BEGIN_SRC C++ -n
-double sq(double x) { return x * x; }
-double add(double x, double y) { return x + y; }
 double hypotenuse(double x, double y) {
   auto sqx = sq(x);
   auto sqy = sq(y);
@@ -131,16 +123,39 @@ double hypotenuse(double x, double y) {
   return r;
 }
 #+END_SRC
-If =sq(x)= is the reducible expression, then the continuation is
-conformed by the assignment to =sqx=, statements of lines 5, 6 and 7,
-and whatever the caller of =hypotenuse= does after the function
-returns.  Notice that we treated =sq(x)= as a single step, ignoring
-the complexity of the implementation of =sq=.
+If =sq(x)= is the reducible expression of the current execution, then
+the continuation is conformed by the assignment to =sqx=, statements
+of lines 5, 6 and 7, and whatever the caller of =hypotenuse= does
+after =hypotenuse= returns.  Notice that we treated =sq(x)= as a
+single step, ignoring the complexity of the implementation of =sq=.
 
 
-What these examples are stressing is that a continuation is, in
-layman's terms, "whatever remains to be executed" regardless of the
-granularity level at which we decide to operate in.
+What we are stressing with the examples so far is that a continuation
+is "whatever remains to be executed" regardless of the granularity
+level at which we decide to operate in.  The final example focuses on
+other relevant properties of continuations.
+
+** Example 4: Conditional branches
+
+What is the continuation when line =1= is the reducible expression?
+#+BEGIN_SRC C++ -n
+  if (rand() % 2) {
+    return foo();
+  } else {
+    return bar();
+  }
+#+END_SRC
+Is it necessary to know the result of =rand() % 2= to determine the
+continuation?  This is a tricky question.  There is no such thing as
+/the/ continuation at this point in the execution, but rather two (!)
+continuations.  After evaluating the conditional one continuation is
+/discarded/ and the other one is applied.
+
+
+This example illustrates three more properties about continuations:
+(1) there is not necessarily one continuation at any given time, (2)
+continuations do not have to be applied, and (3) a continuation may be
+selected based on runtime information.
 
 * Continuations and callbacks
 
