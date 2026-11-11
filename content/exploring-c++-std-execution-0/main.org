@@ -1,18 +1,18 @@
 #+title: Exploring C++ =std::execution= 0
 #+author: Gonzalo Juarez
 
-This post is the first entry in a series dissecting C++
+This post is the first entry in a series of posts dissecting C++
 =std::execution=: the framework for asynchronous computation proposed
-for standardization.  The main purpose of this series is to develop an
-understanding of =std::execution='s API and the rationale behind it
-from first principles.  In addition, if you have previously studied
-=std::execution= and any of the following sentences evoked one (or
-more) of the first four [[https://en.wikipedia.org/wiki/Five_stages_of_grief][stages of grief]]
+for standardization.  The main purpose of the series is to develop an
+understanding of =std::execution='s API and (my understanding of) the
+rationale behind it from first principles.  Additionally, those who
+have already studied =std::execution= and found themselves in one of
+the first four [[https://en.wikipedia.org/wiki/Five_stages_of_grief][stages of grief]] when analyzing the meaning of
 - "Senders represent pending work",
 - "Senders compose",
 - "Users rarely need to care about receivers", or
 - "=let_value= is /just/ the bind operator of the Continuation monad",
-then this series may help you reach the acceptance[fn:dislike] stage.
+may find this series useful to reach the acceptance[fn:dislike] stage.
 
 
 [fn:dislike] The reason I dislike the sentences in the bullet points are,
@@ -28,7 +28,7 @@ in order of appearance:
   Continuation monad.
 
 
-We begin with the bare basics: continuations and the shape of
+We begin with the bare basics: continuations and the structure of
 computation under a simplified =std::execution= framework.  We will
 add complexity to the framework as the series progresses, slowly
 converging to =std::execution= as proposed for standardization.
@@ -36,22 +36,22 @@ converging to =std::execution= as proposed for standardization.
 
 * Computation and continuations
 
-We can intuitively define a computation as a process by which some
+A computation can be intuitively defined as a process by which some
 inputs are converted into some outputs by executing a set of steps one
-after the other[fn:computation-model].  We can split the progress of a
-computation being executed by some abstract machine into two pieces:
-already executed steps and to-be-executed steps.  To-be-executed steps
-can be further split into the next /immediate/ step to be executed,
-and the remaining /non-immediate/ steps to be executed.  The former
-step is the *reducible expression* and the latter steps conform the
-*continuation*.
+after the other[fn:computation-model].  At any given time, the execution
+state of a computation can be subdivided into two: already executed
+steps and to-be-executed steps.  To-be-executed steps can be further
+subdivided into the next /immediate/ step to be executed, and the
+remaining /non-immediate/ steps to be executed.  The former step is
+known as the *reducible expression* and the latter steps conform what
+is referred to as the *continuation*.
 
 
-[fn:computation-model] A more theoretical definition would probably
-involve a model of computation such as Turing machines, general
-recursive functions, or lambda calculus.  But it is not the intention
-of this post to be as precise with these details when the general idea
-can be (almost) entirely captured by simpler terminology.
+[fn:computation-model] A more theoretical definition would involve a
+model of computation such as Turing machines, general recursive
+functions, or lambda calculus.  But it is not the intention of this
+post to be as precise with these details when the general idea can be
+(almost) entirely captured by simpler terminology.
 
 
 The wording of the previous paragraph is intentionally vague.  This is
@@ -65,7 +65,7 @@ to apply these ideas.  The following examples should clarify the
 situation.
 
 
-** Example 1: Arithmetic
+** Example 1: Arithmetic expressions
 
 Given the expression =1 + 2 * 3=, the usual precedence rules tell us
 that the first step to be executed is =2 * 3=.  That is, =2 * 3= is
@@ -79,9 +79,10 @@ the result of =2 * 3= is available.  Once the result is available we
 this "filling" as /applying the continuation/.
 
 
-Finally, =1 + 6= has one single step to be executed and an empty
-continuation (no non-immediate next steps).  In other words, after
-executing the reducible expression, the computation is /done/.
+The expression we were left with, =1 + 6=, has one single step to be
+executed and an empty continuation (no non-immediate next steps).  In
+other words, after executing the reducible expression, the computation
+is /done/.
 
 
 This silly example already shows a key property of continuations: they
@@ -89,7 +90,7 @@ are comprised not solely of operational descriptions (=+=), but also
 of the data needed to execute these operations once the continuation
 is applied (=1=).
 
-** Example 2: Statements
+** Example 2: Subsequent statements
 
 There is no reason to limit our understanding of steps of a
 computation to arithmetic expressions.  We could understand steps to
@@ -103,14 +104,14 @@ Consider
   auto sqy = y * y;
   auto r = sqx + sqy;
 #+END_SRC
-A viable execution has line 1 as its reducible expression and
+A valid execution state has line 1 as its reducible expression and
 statements of lines 2 and 3 conform the continuation.
 
-Outside of practicality, it does not really matter what level of step
-granularity we use when discussing continuations as long as we are
-consistent.
 
-** Example 3: Function
+Disregarding practicality, it does not really matter how granular a
+step is when discussing continuations as long as we are consistent.
+
+** Example 3: Function boundaries
 
 So far none of the examples have function calls in them, but this does
 not have to be the case.  Given the function =hypotenuse= as defined
@@ -120,24 +121,30 @@ double hypotenuse(double x, double y) {
   auto sqx = sq(x);
   auto sqy = sq(y);
   auto r = add(sqx, sqy);
-  return r;
+  return sqrt(r);
 }
 #+END_SRC
-If =sq(x)= is the reducible expression of the current execution, then
-the continuation is conformed by the assignment to =sqx=, statements
-of lines 5, 6 and 7, and whatever the caller of =hypotenuse= does
-after =hypotenuse= returns.  Notice that we treated =sq(x)= as a
-single step, ignoring the complexity of the implementation of =sq=.
+if =sq(x)= is the reducible expression of the execution state being
+considered, then the continuation is conformed by the assignment to
+=sqx=, statements of lines 5, 6 and 7, and whatever the caller of
+=hypotenuse= does after =hypotenuse= returns.  Notice that we treated
+=sq(x)= as a single step, ignoring the complexity of the
+implementation of =sq=.
 
 
-What we are stressing with the examples so far is that a continuation
-is "whatever remains to be executed" regardless of the granularity
-level at which we decide to operate in.  The final example focuses on
-other relevant properties of continuations.
+The examples so far are stressing the idea that a continuation is
+"whatever remains to be executed".  This holds regardless of the
+granularity level at which we decide to operate in.
+
+
+The final example focuses on other relevant properties of
+continuations.
 
 ** Example 4: Conditional branches
 
-What is the continuation when line =1= is the reducible expression?
+Consider the code listing below, what is the continuation when line
+=1= is the reducible expression?  Is it necessary to know the result
+of =rand() % 2= to determine the continuation?
 #+BEGIN_SRC C++ -n
   if (rand() % 2) {
     return foo();
@@ -145,22 +152,22 @@ What is the continuation when line =1= is the reducible expression?
     return bar();
   }
 #+END_SRC
-Is it necessary to know the result of =rand() % 2= to determine the
-continuation?  This is a tricky question.  There is no such thing as
-/the/ continuation at this point in the execution, but rather two (!)
-continuations.  After evaluating the conditional one continuation is
+This is a tricky question.  There is no such thing as /the/
+continuation at this point in the execution, but rather two (!)
+continuations.  After evaluating the conditional, one continuation is
 /discarded/ and the other one is applied.
 
 
-This example illustrates three more properties about continuations:
-(1) there is not necessarily one continuation at any given time, (2)
-continuations do not have to be applied, and (3) a continuation may be
-selected based on runtime information.
+This example illustrates three more properties of continuations: (1)
+there is not necessarily one continuation at any given time; (2)
+continuations do not have to be applied -- they can be discarded; and
+(3) a continuation may be applied or discarded based on runtime
+information.
 
-* Continuations and callbacks
+* Continuation Passing Style
 
 
-* From continuations to =std::execution=
+* From CPS to =std::execution=
 
 
 # #+BEGIN_EXPORT html
