@@ -43,8 +43,8 @@ state of a computation can be subdivided into two: already executed
 steps and to-be-executed steps.  To-be-executed steps can be further
 subdivided into the next /immediate/ step to be executed, and the
 remaining /non-immediate/ steps to be executed.  The former step is
-known as the *reducible expression* and the latter steps conform what
-is referred to as the *continuation*.
+known as the *reducible expression* (redex for short) and the latter
+steps conform what is referred to as the *continuation*.
 
 
 [fn:computation-model] A more theoretical definition would involve a
@@ -69,7 +69,7 @@ following examples should clarify the situation.
 
 Given the expression =1 + 2 * 3=, the usual precedence rules tell us
 that the first step to be executed is =2 * 3=.  That is, =2 * 3= is
-the reducible expression and =1 + ...= is the continuation.
+the redex and =1 + ...= is the continuation.
 
 
 While =2 * 3= is executed, the result of =1 + ...= remains
@@ -81,8 +81,7 @@ substitution process is denoted as /applying the continuation/.
 
 The expression we are left with, =1 + 6=, has one single step to be
 executed and an empty continuation (no non-immediate next steps).  In
-other words, after executing the reducible expression, the computation
-is /done/.
+other words, after executing the redex, the computation is /done/.
 
 
 This silly example already shows a key property of continuations: they
@@ -99,13 +98,17 @@ execution.
 
 
 Consider
+
+#+NAME: listing:example-2
+#+CAPTION: Example 2
 #+BEGIN_SRC C++ -n
   auto sqx = x * x;
   auto sqy = y * y;
   auto r = sqx + sqy;
 #+END_SRC
-A valid execution state has the statement in line 1 as its reducible
-expression and statements of lines 2 and 3 conform its continuation.
+
+A valid execution state has the statement in line 1 as its redex and
+statements of lines 2 and 3 conform its continuation.
 
 
 Disregarding practicality, it does not really matter how granular
@@ -117,6 +120,9 @@ consistent.
 So far none of the examples have function calls in them, but this does
 not have to be the case.  Given the function =hypotenuse= as defined
 below
+
+#+NAME: listing:example-3
+#+CAPTION: Example 3
 #+BEGIN_SRC C++ -n
 double hypotenuse(double x, double y) {
   auto sqx = sq(x);
@@ -125,11 +131,11 @@ double hypotenuse(double x, double y) {
   return sqrt(r);
 }
 #+END_SRC
-If =sq(x)= is the reducible expression of an execution state, then its
-continuation is conformed by the assignment to =sqx=, statements of
-lines 5, 6 and 7, and whatever the caller of =hypotenuse= does after
-=hypotenuse= returns.  Notice that we treated =sq(x)= as a single
-step, ignoring the complexity of the implementation of =sq=.
+If =sq(x)= is the redex of an execution state, then its continuation
+is conformed by the assignment to =sqx=, statements of lines 5, 6 and
+7, and whatever the caller of =hypotenuse= does after =hypotenuse=
+returns.  Notice that we treated =sq(x)= as a single step, ignoring
+the complexity of the implementation of =sq=.
 
 
 The notion being stressed throughout these first three examples, is
@@ -144,8 +150,11 @@ some more key properties of continuations.
 <<conditional-branches>>
 
 Consider the code listing below.  What is the continuation when line
-=1= is the reducible expression?  Is it necessary to know the result
-of =rand() % 2= to determine the continuation?
+=1= is the redex?  Is it necessary to know the result of =rand() % 2=
+to determine the continuation?
+
+#+NAME: listing:example-4
+#+CAPTION: Example 4
 #+BEGIN_SRC C++ -n
   if (rand() % 2) {
     return foo();
@@ -183,22 +192,25 @@ lambdas.  So we are going to apply the following program
 transformation throughout the whole program:
 
 1. Start from the beginning of the program
-2. Recognize the reducible expression and its continuation.
-3. Replace the reducible expression by a function that
-   1. Takes the parameters needed to execute the reducible expression.
+2. Recognize the redex and its continuation.
+3. <<cps-transform:step-3>>Replace the redex by a function that
+   1. Takes the parameters needed to execute the redex.
    2. Takes one extra invocable parameter per continuation.
    3. Returns the result of applying only one of the invocable
-      parameters of step 3.2 to the reducible expression.
+      parameters of step 3.2 to the redex.
 4. Invoke the function of step 3 with the arguments that allow the
-   execution of the reducible expression and as many lambdas as
-   continuations.  The body of these lambdas correspond to the steps
-   of the continuation to which they are associated.
+   execution of the redex and as many lambdas as continuations.  The
+   body of these lambdas correspond to the steps of the continuation
+   to which they are associated.
 5. For each non-empty lambda created in step 4, repeat the process
-   from step 2 starting from the reducible expression of an execution
-   that begins at the first statement of the lambda.
+   from step 2 starting from the redex of an execution that begins at
+   the first statement of the lambda.
 
 To illustrate the result of this procedure, let us apply it to the
 code below
+
+#+NAME: listing:hypotenuse
+#+CAPTION: Hypotenuse function written in direct style
 #+BEGIN_SRC C++ -n
 double sq(double x) { return x * x; }
 double add(double x, double y) { return x + y; }
@@ -212,6 +224,9 @@ double hypotenuse(double x, double y) {
 #+END_SRC
 
 yielding
+
+#+NAME: listing:cps-hypotenuse
+#+CAPTION: Hypotenuse function written in CPS
 #+BEGIN_SRC C++ -n
 double sq(double x, auto cc) { return cc(x * x); }
 double add(double x, double y, auto cc) { return cc(x + y); }
@@ -227,10 +242,10 @@ double hypotenuse(double x, double y, auto cc) {
 }
 #+END_SRC
 
-If we bare with the ugliness of the resulting code for a second, we
-may notice that this process has effectively given us a way to deal
-with continuations as first-class objects, referred to as *callbacks*.
-The technique that enables this is called *Continuation Passing Style*
+If we bare with the ugliness of the code above for a second, we may
+notice that this process has effectively given us a way to deal with
+continuations as first-class objects, referred to as *callbacks*.  The
+technique that enables this is called *Continuation Passing Style*
 (CPS) and the algorithm described above is the *CPS transform*.
 
 
@@ -238,22 +253,25 @@ Having the continuation be represented by object allows us to do
 whatever one would do with an object (for example, store it in a
 queue, call it a /task queue/).  Of course usually one does not
 perform all of this callback ritual for silly arithmetic expressions,
-but rather when the reducible expression can be resolved
-asynchronously. In such cases, it is beneficial to place the
-continuation in a data structure (queue) so that the program can do
-other stuff while it waits for the completion of the reducible
-expression to be signaled in some form.
+but rather when the redex can be resolved asynchronously. In such
+cases, it is beneficial to place the continuation in a data structure
+(queue) so that the program can do other stuff while it waits for the
+completion of the redex to be signaled in some form.  Once completion
+is signaled and the result is gathered (somehow), the continuation can
+be applied to it.
 
 ** What about =main=
 
 In our ideal CPS world, everything in a program that is written in CPS
-style takes these callback arguments (there can be more than one
-callback, see [[conditional-branches]] and apply the CPS transform).  But
-most of us have to deal with =main= being the entry point of our
-programs.  The signature of =main= cannot be modified, putting it at
-odds with our idealized CPS world.  The solution is simple: =main=
-acts as a barrier between the CPS world and the old world.
+takes these callback arguments (there can be more than one callback,
+see [[conditional-branches][Example 4]] and apply the CPS transform).  But most of us have to
+deal with =main= being the entry point of our programs.  The signature
+of =main= cannot be modified, putting it at odds with our idealized
+CPS world.  The solution is simple: =main= acts as a barrier between
+the CPS world and the direct style world.
 
+#+NAME: listing:main-for-cps
+#+CAPTION: Bridging CPS and direct style in =main=
 #+BEGIN_SRC C++
 void main() {
   std::optional<double> result;
@@ -267,27 +285,105 @@ used to this feeling.
 
 * From CPS to =std::execution=
 
+We are still a couple of program transformations away from the
+simplified =std::execution= framework that was promised by the
+introduction of this post.  It is convenient to have some running
+example to which the described transformations are applied, so we are
+going to start from the point we left off in the [[listing:cps-hypotenuse][CPS hypotenuse
+example]].
 
-# #+BEGIN_EXPORT html
-# <div style="text-align: center;">
-# #+END_EXPORT
-# #+BEGIN_SRC dot :file images/my_output_file.png :cmdline -Kdot -Tpng :exports results
-#   digraph G {
-#     rankdir=LR;
-#     initial [shape=point, width=0.15, label=""];
-#     initial -> A;
-#     A -> B -> C;
-#     A -> D;
-#     A -> A;
-#     D -> E;
-#     C -> E;
-#     {
-#       rank=same;
-#       B;
-#       D;
-#     }
-#   }
-# #+END_SRC
-# #+BEGIN_EXPORT html
-# </div>
-# #+END_EXPORT
+** Getting a uniform shape
+
+We have already seen how [[Cps-transform:step-3][step 3]] of the CPS transform creates a new
+function whose parameter list holds two kinds of parameters:
+
+
+1. The data that allows the execution of the redex.
+2. The callbacks representing the continuations of the redex.
+
+
+The purpose of the next transformation is to refactor each of these
+newly created functions into a new one.  This new function is
+structured so that the split between redex arguments and callback
+arguments is evident.  [[Https://en.wikipedia.org/wiki/Currying][Currying]] the callback arguments achieves this
+goal.  For the running example the result is shown below.
+
+#+NAME: listing:curried-cps-hypotenuse
+#+CAPTION: Hypotenuse function written in curried CPS
+#+BEGIN_SRC C++ -n
+double sq(double x) { return [=](auto cc) { return cc(x * x); }; }
+double add(double x, double y) { return [=](auto cc) { return cc(x + y); }; }
+double sqr(double x) { return [=](auto cc) { return cc(sqrt(x)); }; }
+double hypotenuse(double x, double y) {
+  return [=](auto cc) {
+    return sq(x, [&](double sqx) {
+      return sq(y, [&](double sqy) {
+        return add(sqx, sqy, [&](double r) {
+          return sqr(r, cc);
+        });
+      });
+    });
+  };
+}
+#+END_SRC
+
+If we bare with the ugliness of the code above for a second, we may
+notice that this achieves the clear split between parameters used by
+the redex and the callbacks that represent the continuation.  Now
+invoking a function written in *curried CPS* -- unlike CPS, this
+nomenclature is non standard -- is two stepped:
+
+
+1. First, the redex arguments get passed into the function.
+2. Second, the callbacks representing the continuations get passed
+   into the lambda returned by the function.
+
+
+One can also think of the invocation of curried CPS functions in terms
+of finite state machines (FSM):
+
+- When no argument has been passed into the function, the FSM is in a
+  *non-configured* state.
+
+- When the function is applied to the redex arguments, the FSM
+  transitions to a *disconnected* state.  At this point the redex has
+  not yet executed, but all the information needed to do so is
+  available.
+
+- Finally, when the returned lambda is applied to the callback
+  arguments, the FSM transitions to the *started* state.  Execution of
+  the redex begins and one of the callbacks is applied to the result
+  of the redex.
+
+
+#+BEGIN_EXPORT html
+<div style="text-align: center;">
+#+END_EXPORT
+#+NAME: figure:curried-cps-fsm
+#+CAPTION: Hypotenuse function written in curried CPS
+#+BEGIN_SRC dot :file images/curried-cps.png :cmdline -Kdot -Tpng :exports results
+  digraph G {
+    initial [shape=point, width=0.15, label=""];
+    initial -> "Non-configured";
+    "Non-configured" -> Disconnected [label=" redex args"];
+    Disconnected -> Started [label=" callbacks"];
+  }
+#+END_SRC
+#+BEGIN_EXPORT html
+</div>
+#+END_EXPORT
+
+Before applying this transformation, each CPS function required us to
+inspect its parameter list to figure out which parameters are required
+by the redex and which are callbacks.  Now this is always known from
+the structure of the curried CPS functions.  Such /uniformity/ is
+really useful for the sorts of generic programming that is heavily
+used throughout =std::execution=.
+
+** Being lazy
+
+** Refactoring this mess
+
+** Simplified =std::execution=
+
+* Conclusions
