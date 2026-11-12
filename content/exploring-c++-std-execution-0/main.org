@@ -56,13 +56,13 @@ post to be as precise with these details when the general idea can be
 
 The wording of the previous paragraph is intentionally vague.  This is
 to prevent its understanding in terms that are too concrete for the
-level of reasoning we are aiming for.  If in place of "steps" the
-paragraph used "instructions", we could easily (mis)understand
-reducible expressions and continuations to be defined in terms of CPU
-instructions.  While CPU instructions could be thought of as steps,
-they are far from the only /granularity level/ at which we would like
-to apply these ideas.  The following examples should clarify the
-situation.
+level of reasoning we are aiming for.  If in place of the word "steps"
+the paragraph used the word "instructions", then for us programmers
+this could be easily (mis)understood as a definition of reducible
+expressions and continuations in terms of CPU instructions.  While CPU
+instructions could be thought of as steps, they are far from the only
+abstraction level at which we would like to apply these ideas.  The
+following examples should clarify the situation.
 
 
 ** Example 1: Arithmetic expressions
@@ -74,12 +74,12 @@ the reducible expression and =1 + ...= is the continuation.
 
 While =2 * 3= is executed, the result of =1 + ...= remains
 undetermined.  We can think of =1 + ...= as being /suspended/ until
-the result of =2 * 3= is available.  Once the result is available we
-"fill" the ellipsis of =1 + ...= to obtain =1 + 6=. We will refer to
-this "filling" as /applying the continuation/.
+the result of =2 * 3= is available.  Once the result is available, we
+substitute the ellipsis in =1 + ...= to obtain =1 + 6=.  This
+substitution process is denoted as /applying the continuation/.
 
 
-The expression we were left with, =1 + 6=, has one single step to be
+The expression we are left with, =1 + 6=, has one single step to be
 executed and an empty continuation (no non-immediate next steps).  In
 other words, after executing the reducible expression, the computation
 is /done/.
@@ -92,10 +92,10 @@ is applied (=1=).
 
 ** Example 2: Subsequent statements
 
-There is no reason to limit our understanding of steps of a
-computation to arithmetic expressions.  We could understand steps to
-be statements, and the order of execution would be the usual
-top-to-bottom statement execution.
+There is no reason to limit the abstraction level of "steps" just to
+arithmetic expressions.  We could take a step to be a statement.  The
+order of execution is given by the usual top-to-bottom statement
+execution.
 
 
 Consider
@@ -104,12 +104,13 @@ Consider
   auto sqy = y * y;
   auto r = sqx + sqy;
 #+END_SRC
-A valid execution state has line 1 as its reducible expression and
-statements of lines 2 and 3 conform the continuation.
+A valid execution state has the statement in line 1 as its reducible
+expression and statements of lines 2 and 3 conform its continuation.
 
 
-Disregarding practicality, it does not really matter how granular a
-step is when discussing continuations as long as we are consistent.
+Disregarding practicality, it does not really matter how granular
+(abstract) a step is when discussing continuations as long as we are
+consistent.
 
 ** Example 3: Function boundaries
 
@@ -124,26 +125,25 @@ double hypotenuse(double x, double y) {
   return sqrt(r);
 }
 #+END_SRC
-if =sq(x)= is the reducible expression of the execution state being
-considered, then the continuation is conformed by the assignment to
-=sqx=, statements of lines 5, 6 and 7, and whatever the caller of
-=hypotenuse= does after =hypotenuse= returns.  Notice that we treated
-=sq(x)= as a single step, ignoring the complexity of the
-implementation of =sq=.
+If =sq(x)= is the reducible expression of an execution state, then its
+continuation is conformed by the assignment to =sqx=, statements of
+lines 5, 6 and 7, and whatever the caller of =hypotenuse= does after
+=hypotenuse= returns.  Notice that we treated =sq(x)= as a single
+step, ignoring the complexity of the implementation of =sq=.
 
 
-The examples so far are stressing the idea that a continuation is
-"whatever remains to be executed".  This holds regardless of the
-granularity level at which we decide to operate in.
+The notion being stressed throughout these first three examples, is
+that of continuations being "whatever remains to be executed",
+regardless of the abstraction level at which we decide to operate in.
 
 
-The final example focuses on other relevant properties of
-continuations.
+Before dealing with more interesting stuff, the final example displays
+some more key properties of continuations.
 
 ** Example 4: Conditional branches
 <<conditional-branches>>
 
-Consider the code listing below, what is the continuation when line
+Consider the code listing below.  What is the continuation when line
 =1= is the reducible expression?  Is it necessary to know the result
 of =rand() % 2= to determine the continuation?
 #+BEGIN_SRC C++ -n
@@ -159,11 +159,11 @@ continuations.  After evaluating the conditional, one continuation is
 /discarded/ and the other one is applied.
 
 
-This example illustrates three more properties of continuations: (1)
-there is not necessarily one continuation at any given time; (2)
-continuations do not have to be applied, they can be discarded; and
-(3) a continuation may be applied or discarded based on runtime
-information.
+This example, short as it is, illustrates three more properties of
+continuations: (1) there is not necessarily one continuation at any
+given time; (2) continuations do not have to be applied, they can be
+discarded; and (3) a continuation may be applied or discarded based on
+runtime information.
 
 
 * Continuation Passing Style
@@ -179,24 +179,26 @@ treat continuations as any other kind of object in the language (some
 languages do have such a construct, see [[https://scholarworks.iu.edu/dspace/items/52d1b603-67cd-4ba8-afbb-645cfdaa4f74/full][call/cc in Scheme]]).  What we
 do have in C++ are function objects which can be passed around as
 arguments to functions -- this is made easier by the existence of
-lambdas.  So what we are going to do is the following
+lambdas.  So we are going to apply the following program
+transformation throughout the whole program:
 
 1. Start from the beginning of the program
 2. Recognize the reducible expression and its continuation.
 3. Replace the reducible expression by a function that
-   1. Takes the arguments needed to execute the reducible expression.
-   2. Takes one extra argument per continuation, which are function objects.
-   3. Returns the result of applying one of the arguments
-      added by step 3.2 to the reducible expression.
-4. Invoke this new function with the required arguments and as many
-   lambdas as continuations.  The body of these lambdas correspond to
-   the steps of the continuation to which they are associated.
+   1. Takes the parameters needed to execute the reducible expression.
+   2. Takes one extra invocable parameter per continuation.
+   3. Returns the result of applying only one of the invocable
+      parameters of step 3.2 to the reducible expression.
+4. Invoke the function of step 3 with the arguments that allow the
+   execution of the reducible expression and as many lambdas as
+   continuations.  The body of these lambdas correspond to the steps
+   of the continuation to which they are associated.
 5. For each non-empty lambda created in step 4, repeat the process
    from step 2 starting from the reducible expression of an execution
    that begins at the first statement of the lambda.
 
-To illustrate, applying this process to
-
+To illustrate the result of this procedure, let us apply it to the
+code below
 #+BEGIN_SRC C++ -n
 double sq(double x) { return x * x; }
 double add(double x, double y) { return x + y; }
@@ -209,8 +211,7 @@ double hypotenuse(double x, double y) {
 }
 #+END_SRC
 
-yields
-
+yielding
 #+BEGIN_SRC C++ -n
 double sq(double x, auto cc) { return cc(x * x); }
 double add(double x, double y, auto cc) { return cc(x + y); }
@@ -227,19 +228,21 @@ double hypotenuse(double x, double y, auto cc) {
 #+END_SRC
 
 If we bare with the ugliness of the resulting code for a second, we
-can notice that this process has effectively given us a way to deal
+may notice that this process has effectively given us a way to deal
 with continuations as first-class objects, referred to as *callbacks*.
 The technique that enables this is called *Continuation Passing Style*
 (CPS) and the algorithm described above is the *CPS transform*.
 
 
-Having the continuation as an object allows us to store it (for
-example, in a queue).  Of course usually one does not perform all this
-callback ritual for silly arithmetic expressions, but rather when the
-reducible expression is resolved asynchronously. In such cases, it is
-beneficial to place the continuation in a data structure (queue) so
-that the program can do other stuff while it waits for the completion
-of the reducible expression to be signaled in some form.
+Having the continuation be represented by object allows us to do
+whatever one would do with an object (for example, store it in a
+queue, call it a /task queue/).  Of course usually one does not
+perform all of this callback ritual for silly arithmetic expressions,
+but rather when the reducible expression can be resolved
+asynchronously. In such cases, it is beneficial to place the
+continuation in a data structure (queue) so that the program can do
+other stuff while it waits for the completion of the reducible
+expression to be signaled in some form.
 
 ** What about =main=
 
