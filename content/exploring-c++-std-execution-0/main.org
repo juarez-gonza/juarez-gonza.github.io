@@ -219,7 +219,7 @@ to CPS.
 
 #+NAME: listing:cps-transform-step-3
 #+CAPTION: Direct style to Continuation Passing Style: Callee
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
   // Original code: Direct Style
   double sq(double x) { return x * x; }
 
@@ -230,7 +230,7 @@ to CPS.
 
 #+NAME: listing:cps-transform-step-4
 #+CAPTION: Direct style to Continuation Passing Style: Caller
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
   // Original code: Direct Style
   auto sqx = sq(x);
   return foo(sqx);
@@ -247,7 +247,7 @@ with the definitions of =sq=, =add=, and =sqr=.
 
 #+NAME: listing:hypotenuse
 #+CAPTION: Hypotenuse function written in direct style
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
 double sq(double x) { return x * x; }
 double add(double x, double y) { return x + y; }
 double sqr(double x) { return sqrt(x); }
@@ -263,7 +263,7 @@ This yields
 
 #+NAME: listing:cps-hypotenuse
 #+CAPTION: Hypotenuse function written in CPS
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
 double sq(double x, auto cc) { return cc(x * x); }
 double add(double x, double y, auto cc) { return cc(x + y); }
 double sqr(double x, auto cc) { return cc(sqrt(x)); }
@@ -343,7 +343,7 @@ order gain a clear separation between these two kinds of arguments.
 
 #+NAME: listing:curry-cps-callee
 #+CAPTION: CPS to curried CPS: Callee
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
   // CPS
   auto sq(double x, auto cc) { return cc(x * x); }
 
@@ -354,7 +354,7 @@ order gain a clear separation between these two kinds of arguments.
 
 #+NAME: listing:curry-cps-caller
 #+CAPTION: CPS to curried CPS: Caller
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
   // CPS
   return sq(x, [&](double sqx) { return foo(sqx); });
 
@@ -379,7 +379,7 @@ Currying the CPS =hypotenuse= example of Listing
 
 #+NAME: listing:curried-cps-hypotenuse
 #+CAPTION: Hypotenuse function written in curried CPS
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
 auto sq(double x) { return [=](auto cc) { return cc(x * x); }; }
 auto add(double x, double y) { return [=](auto cc) { return cc(x + y); }; }
 auto sqr(double x) { return [=](auto cc) { return cc(sqrt(x)); }; }
@@ -482,7 +482,7 @@ applied to curried CPS functions is depicted in the listings below.
 
 #+NAME: listing:lazy-curry-cps-callee
 #+CAPTION: Curried CPS to lazy curried CPS: Callee
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
   // Curried CPS
   auto sq(double x) { return [=](auto cc) { return cc(x * x); }; }
 
@@ -493,7 +493,7 @@ applied to curried CPS functions is depicted in the listings below.
 
 #+NAME: listing:lazy-curry-cps-caller
 #+CAPTION: Curried CPS to lazy curried CPS: Caller
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
   // Curried CPS
   return sq(x)([&](double sqx) { return foo(sqx); });
 
@@ -513,7 +513,7 @@ so.  The problematic case is depicted in Listing
 
 #+NAME: listing:lazy-curry-cps-caller-dangling
 #+CAPTION: Lazy curried CPS dangling at call-site
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
   /* thunk_type */ auto sq_plus(double x, double y) {
     return sq(x)([&](double sqx) { return sqx + y; });
   } // ERROR! The callback has not been invoked yet, `y` has been destructed
@@ -528,7 +528,7 @@ in Listing [[listing:lazy-curried-cps-hypotenuse]].
 
 #+NAME: listing:lazy-curried-cps-hypotenuse
 #+CAPTION: Hypotenuse function written in lazy curried CPS
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
 auto sq(double x) { return [=](auto cc) { return [=]() { return cc(x * x); }; }; }
 auto add(double x, double y) { return [=](auto cc) { return [=]() { return cc(x + y); }; }; }
 auto sqr(double x) { return [=](auto cc) { return [=]() { return cc(sqrt(x)); }; }; }
@@ -621,7 +621,7 @@ be =zero=, =operator===, and =successor= functions (let us ignore the
 efficiency aspect for now).
 
 
-We can carry rephrase the notion of computational basis for types to
+We can reformulate the notion of computational basis for types to
 obtain the notion of computational basis for computation itself.  The
 procedures on computations are simply the compositional patterns that
 enable constructing larger computations from smaller ones.  A
@@ -644,7 +644,9 @@ way to represent computations, these facts about compositional
 patterns and computational basis apply to the framework we have
 developed throughout the last few sections.  We can readily identify a
 basis in Listing [[listing:lazy-curried-cps-hypotenuse]]: lifting and
-sequencing.
+sequencing.  We will use these patterns to remove noise from the
+running example, making it more maintainable and aesthetically
+pleasing.
 
 *** Lifting
 
@@ -657,7 +659,7 @@ the listing below.
 
 #+NAME: listing:just
 #+CAPTION: Lifting with =just=
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
 auto just(auto value) {
   return [=](auto cc) {
     return [=]() {
@@ -672,10 +674,6 @@ The code is straightforward, the function =just= is in lazy curried
 CPS and it simply captures a value and forwards it to the
 user-provided callback.
 
-
-Before showing its usage in the running example, we need to develop
-the computation sequencing pattern.
-
 *** Sequencing
 
 A basic compositional pattern between computations is using the
@@ -684,7 +682,7 @@ function in Listing [[listing:let_value]], =let_value=, captures this pattern.
 
 #+NAME: listing:let_value
 #+CAPTION: Sequencing with =let_value=
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
 auto let_value(auto f_disconnected, auto g_nonconfig) {
   return [=](auto cc) {
     return [=]() {
@@ -704,10 +702,13 @@ The names chosen for the parameters and variables of Listing
 [[listing:let_value]] reference the states of the state machine used to
 understand the application of lazy curried CPS in the [[sec:laziness-and-thunks][previous
 section]].  Both parameters are functions written in lazy curried CPS,
-but =f_disconnected= already has its redex arguments available, while
-=g_nonconfig= does not.  =let_value= executes the computation enclosed
-by =f_disconnected= and forwards its result as the redex arguments of
-=g_nonconfig=.
+but =f_disconnected= has been already partially applied to its redex
+arguments by the time =let_value= is applied to it, while
+=g_nonconfig= has no arguments available to it.  =let_value= executes
+the computation enclosed by =f_disconnected= and forwards its result
+as the redex arguments of =g_nonconfig=, obtaining =g_disconnected=.
+Lastly, the callback argument of =let_value= is the attached to
+=g_disconnected=, obtaining a thunk which is immediately invoked.
 
 
 With =let_value= and =just= at hand, we can already improve the
@@ -717,7 +718,7 @@ readability of the running example quite a bit. Listing
 
 #+NAME: listing:example-refactor-with-let-value-and-just
 #+CAPTION: Refactor of =sq= with =let_value= and =just=
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
 // Lazy curried CPS
 auto sq(double x) { return [=](auto cc) { return [=]() { return cc(x * x); }; }; }
 
@@ -732,13 +733,13 @@ auto mul_(auto xy) { return std::apply(std::multiplies{}, xy); }
 Now the callback argument and the two lambdas corresponding to the
 currying of the callback parameter and the thunk are implicit. But
 this can be further improved. The usage pattern of =mul_= is common to
-=sq=, =add=, =sqr=. It is captured by the =then= algorithm, which can
-be seen as a sort of lifting of a mapping function -- a function that
-you would use with =std::transform=.
+=sq=, =add=, =sqr= and it is captured by the =then= algorithm.  This
+algorithm can be seen as a sort of lifting, like =just=, but for
+mapping functions (functions suitable for =std::transform=).
 
 #+NAME: listing:then
 #+CAPTION: Mapping with =then=
-#+BEGIN_SRC C++ -n
+#+BEGIN_SRC C++
 auto then(auto f_disconnected, auto map) {
   return let_value(f_disconnected, [=](auto f_ret) {
     return [=](auto cc) {
@@ -755,30 +756,104 @@ shown in Listing [[listing:cps-compositional-patterns-hypotenuse]].
 
 #+NAME: listing:cps-compositional-patterns-hypotenuse
 #+CAPTION: Hypotenuse function written with CPS compositional patterns
-#+BEGIN_SRC C++ -n
-  // mul_, add_, sqrt_ are the usual arithmetic operations.
-  // binary operations taking a pair instead of two args
+#+BEGIN_SRC C++
+// mul_, add_, sqrt_ are the usual arithmetic operations.
+// binary operations taking a pair instead of two args
 
-  auto sq(double x) {
-    return then(just(make_pair(x, x)), mul_);
-  }
-  auto add(double x, double y) {
-    return then(just(make_pair(x, y)), add_);
-  }
-  auto sqr(double x) {
-    return then(just(x), sqrt_);
-  }
-  auto hypotenuse(double x, double y) {
-    return let_value(sq(x), [=](double sqx) {
-      return let_value(sq(y), [=](double sqy) {
-        return let_value(add(sqx, sqy), [=](double r) {
-          return sqr(r);
-        });
+auto sq(double x) { return then(just(make_pair(x, x)), mul_); }
+auto add(double x, double y) { return then(just(make_pair(x, y)), add_); }
+auto sqr(double x) { return then(just(x), sqrt_); }
+auto hypotenuse(double x, double y) {
+  return let_value(sq(x), [=](double sqx) {
+    return let_value(sq(y), [=](double sqy) {
+      return let_value(add(sqx, sqy), [=](double r) {
+        return sqr(r);
       });
     });
-  }
+  });
+}
 #+END_SRC
 
 ** Simplified =std::execution=
+
+Compositional patterns over lazy curried CPS, as developed over the
+last sections, are analogous in many ways to the control flow
+mechanism proposed by =std::execution=:
+
+- Callbacks are analogous to receivers.
+  - They are the channel through which results are propagated.
+- Thunks are analogous to operation state.
+  - They ensure redex arguments' lifetime until completion.
+  - Once called / =start()=-ed the redex is executed.
+- Lazy curried CPS functions are analogous to senders.
+  - They enclose computation, but do not execute it (lazy).
+  - They are =connect=-ed to a callback / receiver.
+- Compositional patterns are analogous to sender adaptors.
+  - They take lazy curried CPS functions / senders and return lazy
+    curried CPS functions / senders.
+  - They describe the way in which computations are composed.
+
+We now translate the lazy curried CPS compositional patterns into a
+structure more alike that of =std::execution='s senders adaptors.
+
+*** Simplified =just=
+
+#+BEGIN_SRC C++
+  namespace just_ {
+    template<typename Rcv, typename T>
+    struct op {
+      Rcv next;
+      T x;
+      void start() { next.set_value(x); }
+    };
+
+    template<typename T>
+    struct snd {
+      T x;
+      template<typename Rcv>
+      auto connect(Rcv next) -> op<Rcv, T> { return {next, x}; }
+    };
+  } // namespace just_
+
+  static constexpr just = [](auto x) { return just_::snd(x); };
+#+END_SRC
+
+*** Simplified =let_value=
+
+
+#+BEGIN_SRC C++
+  namespace let_value_ {
+    template<typename F>
+    struct first_rcv {
+      F f;
+      void set_value(auto x) { return f(x); }
+    };
+
+    template<typename Rcv, typename Prev, typename MakeSnd>
+    struct op {
+      Rcv next;
+      Prev prev;
+      MakeSnd make_snd;
+
+      void start() {
+        prev.connect(first_rcv{[this](auto first_result) {
+  	make_snd(first_result).connect(next).start();
+        }}).start();
+      }
+    };
+
+    template<typename Prev, typename MakeSnd>
+    struct snd {
+      Prev prev;
+      MakeSnd make_snd;
+
+      template<typename Rcv>
+      auto connect(Rcv rcv) -> op<Rcv, Prev, MakeSnd> { return {rcv, prev, make_snd}; }
+    };
+  } // namespace let_value_
+
+  static constexpr let_value = [](auto prev, auto make_snd) { return let_value_::snd(prev, make_snd); };
+#+END_SRC
+
 
 * Conclusions
