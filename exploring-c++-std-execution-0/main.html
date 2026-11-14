@@ -21,20 +21,28 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#orgeb88e46">Computation and continuations</a>
+<li><a href="#orgead37cc">Computation and continuations</a>
 <ul>
-<li><a href="#org7d2d6ad">Example 1: Arithmetic expressions</a></li>
-<li><a href="#org38ee546">Example 2: Subsequent statements</a></li>
-<li><a href="#org5b564bf">Example 3: Function boundaries</a></li>
-<li><a href="#orgf2e5be9">Example 4: Conditional branches</a></li>
+<li><a href="#org2e66bef">Example 1: Arithmetic expressions</a></li>
+<li><a href="#orgf9d5988">Example 2: Subsequent statements</a></li>
+<li><a href="#orgf593212">Example 3: Function boundaries</a></li>
+<li><a href="#orgb174b53">Example 4: Conditional branches</a></li>
 </ul>
 </li>
-<li><a href="#org38d6ccf">Continuation Passing Style</a>
+<li><a href="#org5b19d8f">Continuation Passing Style</a>
 <ul>
-<li><a href="#org71e7d0a">What about <code>main</code></a></li>
+<li><a href="#org4bfe2fa">What about <code>main</code></a></li>
 </ul>
 </li>
-<li><a href="#orgfa5bab4">From CPS to <code>std::execution</code></a></li>
+<li><a href="#org74693b1">From CPS to <code>std::execution</code></a>
+<ul>
+<li><a href="#org4ada441">Currying the callback arguments</a></li>
+<li><a href="#org9ef434e">Laziness and thunks</a></li>
+<li><a href="#orgcbc2203">Refactoring with Higher Order CPS Functions</a></li>
+<li><a href="#org49155f5">Simplified <code>std::execution</code></a></li>
+</ul>
+</li>
+<li><a href="#orga118ef7">Conclusions</a></li>
 </ul>
 </div>
 </div>
@@ -66,9 +74,9 @@ converging to <code>std::execution</code> as proposed for standardization.
 </p>
 
 
-<div id="outline-container-orgeb88e46" class="outline-2">
-<h2 id="orgeb88e46">Computation and continuations</h2>
-<div class="outline-text-2" id="text-orgeb88e46">
+<div id="outline-container-orgead37cc" class="outline-2">
+<h2 id="orgead37cc">Computation and continuations</h2>
+<div class="outline-text-2" id="text-orgead37cc">
 <p>
 A computation can be intuitively defined as a process by which some
 inputs are converted into some outputs by executing a set of steps one
@@ -77,49 +85,48 @@ state of a computation can be subdivided into two: already executed
 steps and to-be-executed steps.  To-be-executed steps can be further
 subdivided into the next <i>immediate</i> step to be executed, and the
 remaining <i>non-immediate</i> steps to be executed.  The former step is
-known as the <b>reducible expression</b> and the latter steps conform what
-is referred to as the <b>continuation</b>.
+known as the <b>reducible expression</b> (redex for short) and the latter
+steps conform what is referred to as the <b>continuation</b>.
 </p>
 
 
 <p>
 The wording of the previous paragraph is intentionally vague.  This is
 to prevent its understanding in terms that are too concrete for the
-level of reasoning we are aiming for.  If in place of "steps" the
-paragraph used "instructions", we could easily (mis)understand
-reducible expressions and continuations to be defined in terms of CPU
-instructions.  While CPU instructions could be thought of as steps,
-they are far from the only <i>granularity level</i> at which we would like
-to apply these ideas.  The following examples should clarify the
-situation.
+level of reasoning we are aiming for.  If in place of the word "steps"
+the paragraph used the word "instructions", then for us programmers
+this could be easily (mis)understood as a definition of reducible
+expressions and continuations in terms of CPU instructions.  While CPU
+instructions could be thought of as steps, they are far from the only
+abstraction level at which we would like to apply these ideas.  The
+following examples should clarify the situation.
 </p>
 </div>
 
 
-<div id="outline-container-org7d2d6ad" class="outline-3">
-<h3 id="org7d2d6ad">Example 1: Arithmetic expressions</h3>
-<div class="outline-text-3" id="text-org7d2d6ad">
+<div id="outline-container-org2e66bef" class="outline-3">
+<h3 id="org2e66bef">Example 1: Arithmetic expressions</h3>
+<div class="outline-text-3" id="text-org2e66bef">
 <p>
 Given the expression <code>1 + 2 * 3</code>, the usual precedence rules tell us
 that the first step to be executed is <code>2 * 3</code>.  That is, <code>2 * 3</code> is
-the reducible expression and <code>1 + ...</code> is the continuation.
+the redex and <code>1 + ...</code> is the continuation.
 </p>
 
 
 <p>
 While <code>2 * 3</code> is executed, the result of <code>1 + ...</code> remains
 undetermined.  We can think of <code>1 + ...</code> as being <i>suspended</i> until
-the result of <code>2 * 3</code> is available.  Once the result is available we
-"fill" the ellipsis of <code>1 + ...</code> to obtain <code>1 + 6</code>. We will refer to
-this "filling" as <i>applying the continuation</i>.
+the result of <code>2 * 3</code> is available.  Once the result is available, we
+substitute the ellipsis in <code>1 + ...</code> to obtain <code>1 + 6</code>.  This
+substitution process is denoted as <i>applying the continuation</i>.
 </p>
 
 
 <p>
-The expression we were left with, <code>1 + 6</code>, has one single step to be
+The expression we are left with, <code>1 + 6</code>, has one single step to be
 executed and an empty continuation (no non-immediate next steps).  In
-other words, after executing the reducible expression, the computation
-is <i>done</i>.
+other words, after executing the redex, the computation is <i>done</i>.
 </p>
 
 
@@ -132,49 +139,53 @@ is applied (<code>1</code>).
 </div>
 </div>
 
-<div id="outline-container-org38ee546" class="outline-3">
-<h3 id="org38ee546">Example 2: Subsequent statements</h3>
-<div class="outline-text-3" id="text-org38ee546">
+<div id="outline-container-orgf9d5988" class="outline-3">
+<h3 id="orgf9d5988">Example 2: Subsequent statements</h3>
+<div class="outline-text-3" id="text-orgf9d5988">
 <p>
-There is no reason to limit our understanding of steps of a
-computation to arithmetic expressions.  We could understand steps to
-be statements, and the order of execution would be the usual
-top-to-bottom statement execution.
+There is no reason to limit the abstraction level of "steps" just to
+arithmetic expressions.  We could take a step to be a statement.  The
+order of execution is given by the usual top-to-bottom statement
+execution.
 </p>
 
 
 <p>
 Consider
 </p>
+
 <div class="org-src-container">
-<pre class="src src-C++"><span class="linenr">1: </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = x * x;
+<label class="org-src-name"><span class="listing-number">Listing 1: </span>Example 2</label><pre class="src src-C++" id="orgdd3f7df"><span class="linenr">1: </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = x * x;
 <span class="linenr">2: </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqy</span> = y * y;
 <span class="linenr">3: </span><span class="org-keyword">auto</span> <span class="org-variable-name">r</span> = sqx + sqy;
 </pre>
 </div>
+
 <p>
-A valid execution state has line 1 as its reducible expression and
-statements of lines 2 and 3 conform the continuation.
+A valid execution state has the statement in line 1 as its redex and
+statements of lines 2 and 3 conform its continuation.
 </p>
 
 
 <p>
-Disregarding practicality, it does not really matter how granular a
-step is when discussing continuations as long as we are consistent.
+Disregarding practicality, it does not really matter how granular
+(abstract) a step is when discussing continuations as long as we are
+consistent.
 </p>
 </div>
 </div>
 
-<div id="outline-container-org5b564bf" class="outline-3">
-<h3 id="org5b564bf">Example 3: Function boundaries</h3>
-<div class="outline-text-3" id="text-org5b564bf">
+<div id="outline-container-orgf593212" class="outline-3">
+<h3 id="orgf593212">Example 3: Function boundaries</h3>
+<div class="outline-text-3" id="text-orgf593212">
 <p>
 So far none of the examples have function calls in them, but this does
 not have to be the case.  Given the function <code>hypotenuse</code> as defined
 below
 </p>
+
 <div class="org-src-container">
-<pre class="src src-C++"><span class="linenr">1: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+<label class="org-src-name"><span class="listing-number">Listing 2: </span>Example 3</label><pre class="src src-C++" id="org56b3947"><span class="linenr">1: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
 <span class="linenr">2: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = sq(x);
 <span class="linenr">3: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqy</span> = sq(y);
 <span class="linenr">4: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">r</span> = add(sqx, sqy);
@@ -183,43 +194,43 @@ below
 </pre>
 </div>
 <p>
-if <code>sq(x)</code> is the reducible expression of the execution state being
-considered, then the continuation is conformed by the assignment to
-<code>sqx</code>, statements of lines 5, 6 and 7, and whatever the caller of
-<code>hypotenuse</code> does after <code>hypotenuse</code> returns.  Notice that we treated
-<code>sq(x)</code> as a single step, ignoring the complexity of the
-implementation of <code>sq</code>.
+If <code>sq(x)</code> is the redex of an execution state, then its continuation
+is conformed by the assignment to <code>sqx</code>, statements of lines 5, 6 and
+7, and whatever the caller of <code>hypotenuse</code> does after <code>hypotenuse</code>
+returns.  Notice that we treated <code>sq(x)</code> as a single step, ignoring
+the complexity of the implementation of <code>sq</code>.
 </p>
 
 
 <p>
-The examples so far are stressing the idea that a continuation is
-"whatever remains to be executed".  This holds regardless of the
-granularity level at which we decide to operate in.
+The notion being stressed throughout these first three examples, is
+that of continuations being "whatever remains to be executed",
+regardless of the abstraction level at which we decide to operate in.
 </p>
 
 
 <p>
-The final example focuses on other relevant properties of
-continuations.
+Before dealing with more interesting stuff, the final example displays
+some more key properties of continuations.
 </p>
 </div>
 </div>
 
-<div id="outline-container-orgf2e5be9" class="outline-3">
-<h3 id="orgf2e5be9">Example 4: Conditional branches</h3>
-<div class="outline-text-3" id="text-orgf2e5be9">
+<div id="outline-container-orgb174b53" class="outline-3">
+<h3 id="orgb174b53">Example 4: Conditional branches</h3>
+<div class="outline-text-3" id="text-orgb174b53">
 <p>
-<a id="org63735a6"></a>
+<a id="org20d5897"></a>
 </p>
 
 <p>
-Consider the code listing below, what is the continuation when line
-<code>1</code> is the reducible expression?  Is it necessary to know the result
-of <code>rand() % 2</code> to determine the continuation?
+Consider the code listing below.  What is the continuation when line
+<code>1</code> is the redex?  Is it necessary to know the result of <code>rand() % 2</code>
+to determine the continuation?
 </p>
+
 <div class="org-src-container">
-<pre class="src src-C++"><span class="linenr">1: </span><span class="org-keyword">if</span> (rand() % 2) {
+<label class="org-src-name"><span class="listing-number">Listing 3: </span>Example 4</label><pre class="src src-C++" id="org60d9c4c"><span class="linenr">1: </span><span class="org-keyword">if</span> (rand() % 2) {
 <span class="linenr">2: </span>  <span class="org-keyword">return</span> foo();
 <span class="linenr">3: </span>} <span class="org-keyword">else</span> {
 <span class="linenr">4: </span>  <span class="org-keyword">return</span> bar();
@@ -235,20 +246,20 @@ continuations.  After evaluating the conditional, one continuation is
 
 
 <p>
-This example illustrates three more properties of continuations: (1)
-there is not necessarily one continuation at any given time; (2)
-continuations do not have to be applied, they can be discarded; and
-(3) a continuation may be applied or discarded based on runtime
-information.
+This example, short as it is, illustrates three more properties of
+continuations: (1) there is not necessarily one continuation at any
+given time; (2) continuations do not have to be applied, they can be
+discarded; and (3) a continuation may be applied or discarded based on
+runtime information.
 </p>
 </div>
 </div>
 </div>
 
 
-<div id="outline-container-org38d6ccf" class="outline-2">
-<h2 id="org38d6ccf">Continuation Passing Style</h2>
-<div class="outline-text-2" id="text-org38d6ccf">
+<div id="outline-container-org5b19d8f" class="outline-2">
+<h2 id="org5b19d8f">Continuation Passing Style</h2>
+<div class="outline-text-2" id="text-org5b19d8f">
 <p>
 Continuations as shown in the examples so far are not very
 interesting.  We have identified them as part of the structure of
@@ -261,34 +272,71 @@ The issue here is that C++ has no language construct that allows us to
 treat continuations as any other kind of object in the language (some
 languages do have such a construct, see <a href="https://scholarworks.iu.edu/dspace/items/52d1b603-67cd-4ba8-afbb-645cfdaa4f74/full">call/cc in Scheme</a>).  What we
 do have in C++ are function objects which can be passed around as
-arguments to functions &#x2013; this is made easier by the existence of
-lambdas.  So what we are going to do is the following
+arguments to functions.  So we are going to apply the following
+program transformation throughout the whole program:
 </p>
 
 <ol class="org-ol">
 <li>Start from the beginning of the program</li>
-<li>Recognize the reducible expression and its continuation.</li>
-<li>Replace the reducible expression by a function that
+<li>Recognize the redex and its continuation.</li>
+<li><a id="org7b79666"></a>Replace the redex by a <i>CPS function</i> (see Listing
+<a href="#org94c2c2e">4</a>). This function:
 <ol class="org-ol">
-<li>Takes the arguments needed to execute the reducible expression.</li>
-<li>Takes one extra argument per continuation, which are function objects.</li>
-<li>Returns the result of applying one of the arguments
-added by step 3.2 to the reducible expression.</li>
+<li>Takes the parameters needed to execute the redex.</li>
+<li>Takes one extra invocable parameter per continuation.  These are
+referred to as <b>callbacks</b>.</li>
+<li>Returns the result of applying only one of the callbacks to the
+evaluated redex.</li>
 </ol></li>
-<li>Invoke this new function with the required arguments and as many
-lambdas as continuations.  The body of these lambdas correspond to
-the steps of the continuation to which they are associated.</li>
-<li>For each non-empty lambda created in step 4, repeat the process
-from step 2 starting from the reducible expression of an execution
-that begins at the first statement of the lambda.</li>
+<li>Invoke the CPS function with the arguments that allow the execution
+of the redex and one lambda per callback argument. Each lambda is
+associated to one of the continuations in the original code.  If
+the associated continuation is empty, then the body of the lambda
+just returns its argument (i.e., it is the identity function).  Otherwise, the body of the lambda
+corresponds to the steps of the associated continuation (see
+Listing <a href="#org51dcd51">5</a>).</li>
+<li><a id="org48bc35c"></a> For each non-identity lambda created in
+step 4, repeat from step 2 using as starting point the first
+statement of the lambda.</li>
 </ol>
 
 <p>
-To illustrate, applying this process to
+The resulting code is said to be written in <b>Continuation Passing
+Style</b> (CPS). The algorithm just described is the <b>CPS transform</b>: a
+mapping from <i>direct style</i> (the usual way in which code is written)
+to CPS.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-C++"><span class="linenr">1: </span><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> x * x; }
+<label class="org-src-name"><span class="listing-number">Listing 4: </span>Direct style to Continuation Passing Style: Callee</label><pre class="src src-C++" id="org94c2c2e"><span class="linenr">1: </span><span class="org-comment-delimiter">// </span><span class="org-comment">Original code: Direct Style
+<span class="linenr">2: </span></span><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> x * x; }
+<span class="linenr">3: </span>
+<span class="linenr">4: </span><span class="org-comment-delimiter">// </span><span class="org-comment">After step 3: Continuation Passing Style
+<span class="linenr">5: </span></span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 5: </span>Direct style to Continuation Passing Style: Caller</label><pre class="src src-C++" id="org51dcd51"><span class="linenr">1: </span><span class="org-comment-delimiter">// </span><span class="org-comment">Original code: Direct Style
+<span class="linenr">2: </span></span><span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = sq(x);
+<span class="linenr">3: </span><span class="org-keyword">return</span> foo(sqx);
+<span class="linenr">4: </span>
+<span class="linenr">5: </span><span class="org-comment-delimiter">// </span><span class="org-comment">After step 4: Continuation Passing Style
+<span class="linenr">6: </span></span><span class="org-keyword">return</span> sq(x, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> foo(sqx); });
+</pre>
+</div>
+
+
+<p>
+<a href="#org48bc35c">Step 5</a> states the iteration tactic of the transformation.  To
+illustrate the result of such iteration, let us apply the procedure to
+the <code>hypotenuse</code> example &#x2013; extended in Listing <a href="#orga1a9e52">6</a>
+with the definitions of <code>sq</code>, <code>add</code>, and <code>sqr</code>.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 6: </span>Hypotenuse function written in direct style</label><pre class="src src-C++" id="orga1a9e52"><span class="linenr">1: </span><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> x * x; }
 <span class="linenr">2: </span><span class="org-type">double</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> x + y; }
 <span class="linenr">3: </span><span class="org-type">double</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> sqrt(x); }
 <span class="linenr">4: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
@@ -301,11 +349,11 @@ To illustrate, applying this process to
 </div>
 
 <p>
-yields
+This yields
 </p>
 
 <div class="org-src-container">
-<pre class="src src-C++"><span class="linenr"> 1: </span><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }
+<label class="org-src-name"><span class="listing-number">Listing 7: </span>Hypotenuse function written in CPS</label><pre class="src src-C++" id="orgaa6830a"><span class="linenr"> 1: </span><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }
 <span class="linenr"> 2: </span><span class="org-type">double</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x + y); }
 <span class="linenr"> 3: </span><span class="org-type">double</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(sqrt(x)); }
 <span class="linenr"> 4: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
@@ -321,40 +369,41 @@ yields
 </div>
 
 <p>
-If we bare with the ugliness of the resulting code for a second, we
-can notice that this process has effectively given us a way to deal
-with continuations as first-class objects, referred to as <b>callbacks</b>.
-The technique that enables this is called <b>Continuation Passing Style</b>
-(CPS) and the algorithm described above is the <b>CPS transform</b>.
+If we bare with the ugliness of the code of Listing
+<a href="#orgaa6830a">7</a> for a second, we may notice that callbacks give
+us a way to deal with continuations as first-class objects.  Having
+the continuation as an object allows us to do whatever one would do
+with an object &#x2013; for example, store it in a queue, call it a <i>task
+queue</i>.
 </p>
 
 
 <p>
-Having the continuation as an object allows us to store it (for
-example, in a queue).  Of course usually one does not perform all this
-callback ritual for silly arithmetic expressions, but rather when the
-reducible expression is resolved asynchronously. In such cases, it is
-beneficial to place the continuation in a data structure (queue) so
-that the program can do other stuff while it waits for the completion
-of the reducible expression to be signaled in some form.
+Of course one does not perform all of this callback ritual for silly
+arithmetic expressions, but rather when the redex can be resolved
+asynchronously. In such cases it is beneficial to place the callback
+in a data structure (queue) so that the program can do other stuff
+while the redex is executed.  Once completion of the redex is signaled
+(somehow) and the result is gathered (somehow), the stored callback
+can be retrived and applied to the result of the redex.
 </p>
 </div>
 
-<div id="outline-container-org71e7d0a" class="outline-3">
-<h3 id="org71e7d0a">What about <code>main</code></h3>
-<div class="outline-text-3" id="text-org71e7d0a">
+<div id="outline-container-org4bfe2fa" class="outline-3">
+<h3 id="org4bfe2fa">What about <code>main</code></h3>
+<div class="outline-text-3" id="text-org4bfe2fa">
 <p>
-In our ideal CPS world, everything in a program that is written in CPS
-style takes these callback arguments (there can be more than one
-callback, see <a href="#org63735a6">No description for this link</a> and apply the CPS transform).  But
-most of us have to deal with <code>main</code> being the entry point of our
-programs.  The signature of <code>main</code> cannot be modified, putting it at
-odds with our idealized CPS world.  The solution is simple: <code>main</code>
-acts as a barrier between the CPS world and the old world.
+In the ideal CPS world, everything in a program that is written in CPS
+takes these callback arguments (there can be more than one callback,
+see <a href="#org20d5897">Example 4</a> and apply the CPS transform).  But most of us have to
+deal with <code>main</code> being the entry point of our programs.  The signature
+of <code>main</code> cannot be modified, putting it at odds with our idealized
+CPS world.  The solution is simple: <code>main</code> acts as a barrier between
+the CPS world and the direct style world.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-C++"><span class="org-type">void</span> <span class="org-function-name">main</span>() {
+<label class="org-src-name"><span class="listing-number">Listing 8: </span>Bridging CPS and direct style in <code>main</code></label><pre class="src src-C++" id="org7614272"><span class="org-type">void</span> <span class="org-function-name">main</span>() {
   <span class="org-constant">std</span>::<span class="org-type">optional</span>&lt;<span class="org-type">double</span>&gt; <span class="org-variable-name">result</span>;
   hypotenuse(2.0, 3.0, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">res</span>) { result = res; });
   <span class="org-constant">std</span>::println(<span class="org-string">"{}"</span>, *result);
@@ -363,17 +412,167 @@ acts as a barrier between the CPS world and the old world.
 </div>
 
 <p>
-Breaking the ideal CPS world feels a bit dirty.  This is C++, we are
-used to this feeling.
+Breaking the ideal CPS world feels a bit dirty.  This is C++, we
+should be used to this feeling.
 </p>
 </div>
 </div>
 </div>
 
-<div id="outline-container-orgfa5bab4" class="outline-2">
-<h2 id="orgfa5bab4">From CPS to <code>std::execution</code></h2>
-<div class="outline-text-2" id="text-orgfa5bab4">
+<div id="outline-container-org74693b1" class="outline-2">
+<h2 id="org74693b1">From CPS to <code>std::execution</code></h2>
+<div class="outline-text-2" id="text-org74693b1">
+<p>
+We are still a couple of program transformations away from the
+simplified <code>std::execution</code> framework that was promised by the
+introduction of this post.  The remaining ones are algorithimically
+less contrived that the CPS transform, but provide relevant features
+to the framework.
+</p>
 </div>
+
+<div id="outline-container-org4ada441" class="outline-3">
+<h3 id="org4ada441">Currying the callback arguments</h3>
+<div class="outline-text-3" id="text-org4ada441">
+<p>
+The CPS function, created at <a href="#org7b79666">step 3</a> of the CPS transform, holds two
+kinds of parameters:
+</p>
+
+
+<ol class="org-ol">
+<li>The data that allows the execution of the redex.</li>
+<li>The callbacks representing the continuations of the redex.</li>
+</ol>
+
+
+<p>
+The purpose of the next transformation is to refactor CPS functions in
+order gain a clear separation between these two kinds of arguments.
+<a href="//en.wikipedia.org/wiki/Currying">Currying</a> the callback arguments achieves this goal (see Listing
+<a href="#orge053256">9</a> and <a href="#orgdd89887">10</a>).
+</p>
+
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 9: </span>CPS to curried CPS: Callee</label><pre class="src src-C++" id="orge053256"><span class="linenr">1: </span><span class="org-comment-delimiter">// </span><span class="org-comment">CPS
+<span class="linenr">2: </span></span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }
+<span class="linenr">3: </span>
+<span class="linenr">4: </span><span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
+<span class="linenr">5: </span></span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }; }  
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 10: </span>CPS to curried CPS: Caller</label><pre class="src src-C++" id="orgdd89887"><span class="linenr">1: </span><span class="org-comment-delimiter">// </span><span class="org-comment">CPS
+<span class="linenr">2: </span></span><span class="org-keyword">return</span> sq(x, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> foo(sqx); });
+<span class="linenr">3: </span>
+<span class="linenr">4: </span><span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
+<span class="linenr">5: </span></span><span class="org-keyword">return</span> sq(x)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> foo(sqx); });
+</pre>
+</div>
+
+
+<p>
+Currying the CPS <code>hypotenuse</code> example of Listing
+<a href="#orgaa6830a">7</a>, we obtain the following.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 11: </span>Hypotenuse function written in curried CPS</label><pre class="src src-C++" id="org6a344aa"><span class="linenr"> 1: </span><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }; }
+<span class="linenr"> 2: </span><span class="org-type">double</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x + y); }; }
+<span class="linenr"> 3: </span><span class="org-type">double</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(sqrt(x)); }; }
+<span class="linenr"> 4: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+<span class="linenr"> 5: </span>  <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
+<span class="linenr"> 6: </span>    <span class="org-keyword">return</span> sq(x, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) {
+<span class="linenr"> 7: </span>      <span class="org-keyword">return</span> sq(y, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqy</span>) {
+<span class="linenr"> 8: </span>        <span class="org-keyword">return</span> add(sqx, sqy, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">r</span>) {
+<span class="linenr"> 9: </span>          <span class="org-keyword">return</span> sqr(r, cc);
+<span class="linenr">10: </span>        });
+<span class="linenr">11: </span>      });
+<span class="linenr">12: </span>    });
+<span class="linenr">13: </span>  };
+<span class="linenr">14: </span>}
+</pre>
+</div>
+
+<p>
+If we bare with the ugliness of the code above for a second, we may
+notice that currying does indeed achieve a clear split between
+parameters used by the redex and the callbacks that represent the
+continuations.
+</p>
+
+
+<p>
+Invoking a function written in <i>curried CPS</i><sup><a id="fnr.3" class="footref" href="#fn.3" role="doc-backlink">3</a></sup> is two
+stepped:
+</p>
+
+<ol class="org-ol">
+<li>The curried CPS function is partially applied to the redex
+arguments.</li>
+<li>The partially applied CPS function is applied to the callbacks.</li>
+</ol>
+
+<p>
+We can also think of the invocation of curried CPS functions in terms
+of finite state machines (FSM):
+</p>
+
+<ul class="org-ul">
+<li>When the curried CPS function has not yet been applied, the FSM is
+in a <b>non-configured</b> state.</li>
+
+<li>When the curried CPS function is partially applied to the redex
+arguments, the FSM transitions to a <b>disconnected</b> state.  At this
+point the redex does not begin execution, but all the information
+needed to do so is available.</li>
+
+<li>Finally, when the partially applied CPS function is appiled to the
+remaining callback arguments, the FSM transitions to the <b>started</b>
+state.  At this point execution of the redex begins.  Once the redex
+is resolved, one of the callbacks is applied to its result.</li>
+</ul>
+
+
+<div style="text-align: center;">
+
+<div id="orgbf0881f" class="figure">
+<p><img src="images/curried-cps.png" alt="curried-cps.png" />
+</p>
+</div>
+
+</div>
+
+<p>
+Summarizing, before currying each CPS function required us to inspect
+its parameter list to figure out which parameters are required by the
+redex and which are callbacks.  Now this is always known from the
+structure of the curried CPS functions.  This <i>uniform shape</i> &#x2013;
+shared by every curried CPS function &#x2013; is really useful for the sorts
+of generic programming that is heavily used throughout
+<code>std::execution</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9ef434e" class="outline-3">
+<h3 id="org9ef434e">Laziness and thunks</h3>
+</div>
+
+<div id="outline-container-orgcbc2203" class="outline-3">
+<h3 id="orgcbc2203">Refactoring with Higher Order CPS Functions</h3>
+</div>
+
+<div id="outline-container-org49155f5" class="outline-3">
+<h3 id="org49155f5">Simplified <code>std::execution</code></h3>
+</div>
+</div>
+
+<div id="outline-container-orga118ef7" class="outline-2">
+<h2 id="orga118ef7">Conclusions</h2>
 </div>
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
@@ -401,6 +600,10 @@ model of computation such as Turing machines, general recursive
 functions, or lambda calculus.  But it is not the intention of this
 post to be as precise with these details when the general idea can be
 (almost) entirely captured by simpler terminology.
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.3" class="footnum" href="#fnr.3" role="doc-backlink">3</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+Unlike CPS, curried CPS is non standard nomenclature.
 </p></div></div>
 
 
