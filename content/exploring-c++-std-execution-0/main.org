@@ -20,7 +20,8 @@ in order of appearance:
 - What is "work" in C++? Is it measured in Joules? What is "pending"?
   Potential energy?
 - How is composition defined in sender-land?  What kind of composition
-  are we talking about?
+  are we talking about?  Safety properties composition? Functional
+  composition?  Other kinds of compositions?  All of the above?
 - Not seeing directly in code is /not/ the same as not caring.
 - Waving the Continuation monad around to C++ programmers without
   explaining it is lazy at best. Moreover, the model of
@@ -607,7 +608,7 @@ would be very naive to expect code like that of Listing
 [[listing:lazy-curried-cps-hypotenuse]] to be maintainable or even
 pleasant to read.
 
-** Refactoring with Higher Order CPS Functions
+** Higher Order CPS Functions and compositional patterns
 
 ** Simplified =std::execution=
 
