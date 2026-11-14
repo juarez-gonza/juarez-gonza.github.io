@@ -1,4 +1,5 @@
 #+title: State machines, dynamic multi-dispatch, and pairings of natural numbers
+#+author: Gonzalo Juarez
 
 In this post I expose a higher order function that performs function
 dispatch based on more than one =enum= value in C++.
