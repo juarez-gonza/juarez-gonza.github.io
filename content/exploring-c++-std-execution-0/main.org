@@ -380,10 +380,10 @@ Currying the CPS =hypotenuse= example of Listing
 #+NAME: listing:curried-cps-hypotenuse
 #+CAPTION: Hypotenuse function written in curried CPS
 #+BEGIN_SRC C++ -n
-double sq(double x) { return [=](auto cc) { return cc(x * x); }; }
-double add(double x, double y) { return [=](auto cc) { return cc(x + y); }; }
-double sqr(double x) { return [=](auto cc) { return cc(sqrt(x)); }; }
-double hypotenuse(double x, double y) {
+auto sq(double x) { return [=](auto cc) { return cc(x * x); }; }
+auto add(double x, double y) { return [=](auto cc) { return cc(x + y); }; }
+auto sqr(double x) { return [=](auto cc) { return cc(sqrt(x)); }; }
+auto hypotenuse(double x, double y) {
   return [=](auto cc) {
     return sq(x)([&](double sqx) {
       return sq(y)([&](double sqy) {
@@ -455,6 +455,7 @@ really useful for the sorts of generic programming that is heavily
 used throughout =std::execution=.
 
 ** Laziness and thunks
+<<sec:laziness-and-thunks>>
 
 Almost all introductions to =std::execution= claim its laziness fairly
 early on.  The purpose of the transformation presented in this section
@@ -503,10 +504,11 @@ applied to curried CPS functions is depicted in the listings below.
 
 Just like the curried callback parameter in the [[listing:curry-cps-callee][previous section]], the
 thunk must capture by value.  This is to prevent dangling of both
-redex and callback arguments.  Before thunks, callbacks created at
-call-site could capture by reference safely.  Now only the caller that
-invokes the thunk can do so.  The problematic case is depicted in
-Listing [[listing:lazy-curry-cps-caller-dangling]].
+redex and callback arguments.  Call-site rules change, however.
+Before thunks callbacks created at call-site could capture by
+reference safely.  Now only the caller that invokes the thunk can do
+so.  The problematic case is depicted in Listing
+[[listing:lazy-curry-cps-caller-dangling]].
 
 
 #+NAME: listing:lazy-curry-cps-caller-dangling
@@ -527,22 +529,22 @@ in Listing [[listing:lazy-curried-cps-hypotenuse]].
 #+NAME: listing:lazy-curried-cps-hypotenuse
 #+CAPTION: Hypotenuse function written in lazy curried CPS
 #+BEGIN_SRC C++ -n
-  double sq(double x) { return [=](auto cc) { return [=]() { return cc(x * x); }; }; }
-  double add(double x, double y) { return [=](auto cc) { return [=]() { return cc(x + y); }; }; }
-  double sqr(double x) { return [=](auto cc) { return [=]() { return cc(sqrt(x)); }; }; }
-  double hypotenuse(double x, double y) {
-    return [=](auto cc) {
-      return [=]() {
-        return sq(x)([&](double sqx) {
-          return sq(y)([&](double sqy) {
-            return add(sqx, sqy)([&](double r) {
-              return sqr(r)(cc)();
-            })();
+auto sq(double x) { return [=](auto cc) { return [=]() { return cc(x * x); }; }; }
+auto add(double x, double y) { return [=](auto cc) { return [=]() { return cc(x + y); }; }; }
+auto sqr(double x) { return [=](auto cc) { return [=]() { return cc(sqrt(x)); }; }; }
+auto hypotenuse(double x, double y) {
+  return [=](auto cc) {
+    return [=]() {
+      return sq(x)([&](double sqx) {
+        return sq(y)([&](double sqy) {
+          return add(sqx, sqy)([&](double r) {
+            return sqr(r)(cc)();
           })();
         })();
-      };
+      })();
     };
-  }
+  };
+}
 #+END_SRC
 
 If we bare with the ugliness of the code above for a second, we may
@@ -615,16 +617,26 @@ defined as the finite set of procedures that enable the construction
 of any other procedure on the type.  In other words, these procedures
 can be [[https://en.wikipedia.org/wiki/Function_composition_(computer_science)][functionally composed]] to obtain any other procedure on the
 type.  For example, for unsigned integers a computational basis could
-be =zero=, =operator===, and =successor= functions.  Efficiency is
-related, but we will ignore it for now.
+be =zero=, =operator===, and =successor= functions (let us ignore the
+efficiency aspect for now).
 
 
-We can carry the notion of computational basis for types to
-computational basis for computation itself.  The procedures on
-computations are simply the compositional patterns that enable
-constructing larger computations from smaller ones.  A computational
-basis for computation is a finite set of compositional patterns from
-which every other compositional pattern can be obtained.
+We can carry rephrase the notion of computational basis for types to
+obtain the notion of computational basis for computation itself.  The
+procedures on computations are simply the compositional patterns that
+enable constructing larger computations from smaller ones.  A
+computational basis for computation is a finite set of compositional
+patterns from which every other compositional pattern can be
+obtained [fn:computational-basis-for-computation].
+
+
+[fn:computational-basis-for-computation] We could say that a model of
+computation provides a representation for the execution state and a
+finite set of procedures to operate on it (i.e. a computational basis
+for computation).  At least that line of reasoning makes sense in the
+computational models I am aware of (Turing machines, lambda calculus,
+SKI combinator calculus, abacus computing, general recursive
+functions).
 
 
 Since the redex and continuations we have been abstracting over are a
@@ -637,10 +649,11 @@ sequencing.
 *** Lifting
 
 Lifting in the context of CPS occurs whenever we want to carry some
-information from the direct style world to the CPS world. In
-=hypotenuse= of Listing [[listing:lazy-curried-cps-hypotenuse]] this
-occurs to the redex arguments (used in =sq=, =add=, =sqr=).  The
-pattern is illustrated below.
+data from the direct style world to the CPS world. In Listing
+[[listing:lazy-curried-cps-hypotenuse]] this occurs to the arguments of
+=hypotenuse=, which are lifted in =sq=, =add=, =sqr= before their
+usage in the redex expressions.  The general pattern is implemented in
+the listing below.
 
 #+NAME: listing:just
 #+CAPTION: Lifting with =just=
@@ -655,15 +668,19 @@ auto just(auto value) {
 #+END_SRC
 
 
-The code above is quite straightforward, the function =just= simply
-captures a value and forwards it to the user-provided callback.
+The code is straightforward, the function =just= is in lazy curried
+CPS and it simply captures a value and forwards it to the
+user-provided callback.
 
 
 Before showing its usage in the running example, we need to develop
-the sequencing pattern.
+the computation sequencing pattern.
 
 *** Sequencing
 
+A basic compositional pattern between computations is using the
+outputs of one computation as the inputs of the next computation.  The
+function in Listing [[listing:let_value]], =let_value=, captures this pattern.
 
 #+NAME: listing:let_value
 #+CAPTION: Sequencing with =let_value=
@@ -683,6 +700,42 @@ auto let_value(auto f_disconnected, auto g_nonconfig) {
 #+END_SRC
 
 
+The names chosen for the parameters and variables of Listing
+[[listing:let_value]] reference the states of the state machine used to
+understand the application of lazy curried CPS in the [[sec:laziness-and-thunks][previous
+section]].  Both parameters are functions written in lazy curried CPS,
+but =f_disconnected= already has its redex arguments available, while
+=g_nonconfig= does not.  =let_value= executes the computation enclosed
+by =f_disconnected= and forwards its result as the redex arguments of
+=g_nonconfig=.
+
+
+With =let_value= and =just= at hand, we can already improve the
+readability of the running example quite a bit. Listing
+[[listing:example-refactor-with-let-value-and-just]] shows the refactor of =sq=.
+
+
+#+NAME: listing:example-refactor-with-let-value-and-just
+#+CAPTION: Refactor of =sq= with =let_value= and =just=
+#+BEGIN_SRC C++ -n
+// Lazy curried CPS
+auto sq(double x) { return [=](auto cc) { return [=]() { return cc(x * x); }; }; }
+
+// Lazy curried CPS with let_value and just
+auto sq(double x) {
+  return let_value(just(make_pair(x, x)), [](auto xy) { return just(mul_(xy)); });
+}
+// where mul_ is:
+auto mul_(auto xy) { return std::apply(std::multiplies{}, xy); }  
+#+END_SRC
+
+Now the callback argument and the two lambdas corresponding to the
+currying of the callback parameter and the thunk are implicit. But
+this can be further improved. The usage pattern of =mul_= is common to
+=sq=, =add=, =sqr=. It is captured by the =then= algorithm, which can
+be seen as a sort of lifting of a mapping function -- a function that
+you would use with =std::transform=.
+
 #+NAME: listing:then
 #+CAPTION: Mapping with =then=
 #+BEGIN_SRC C++ -n
@@ -697,32 +750,33 @@ auto then(auto f_disconnected, auto map) {
 }
 #+END_SRC
 
-*** Refactored example
-
+The running example, after applying these compositional patterns, is
+shown in Listing [[listing:cps-compositional-patterns-hypotenuse]].
 
 #+NAME: listing:cps-compositional-patterns-hypotenuse
 #+CAPTION: Hypotenuse function written with CPS compositional patterns
 #+BEGIN_SRC C++ -n
-// mul_, add_, sqrt_ are the usual arithmetic operations.
-// binary operations taking a pair instead of two args
+  // mul_, add_, sqrt_ are the usual arithmetic operations.
+  // binary operations taking a pair instead of two args
 
-auto sq(double x) {
-  return then(just(make_pair(x, x)), mul_);
-}
-auto add(double x, double y) {
-  return then(just(make_pair(x, y)), add_);
-}
-auto sqr(double x) {
-  return then(just(x), sqrt_);
-}
-auto hypotenuse(double x, double y) {
-  return let_value(sq(x), [=](double sqx) {
-    return let_value(sq(y), [=](double sqy) {
-      return let_value(add(sqx, sqy), [=](double r) {
-        return sqr(r); });
+  auto sq(double x) {
+    return then(just(make_pair(x, x)), mul_);
+  }
+  auto add(double x, double y) {
+    return then(just(make_pair(x, y)), add_);
+  }
+  auto sqr(double x) {
+    return then(just(x), sqrt_);
+  }
+  auto hypotenuse(double x, double y) {
+    return let_value(sq(x), [=](double sqx) {
+      return let_value(sq(y), [=](double sqy) {
+        return let_value(add(sqx, sqy), [=](double r) {
+          return sqr(r);
+        });
+      });
     });
-  });
-}
+  }
 #+END_SRC
 
 ** Simplified =std::execution=
