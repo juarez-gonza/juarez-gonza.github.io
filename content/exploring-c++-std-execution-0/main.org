@@ -463,12 +463,12 @@ is to grant curried CPS functions the property of lazy execution.
 
 The rationale behind wanting laziness in an asynchronous programming
 framework has been thoroughly discussed and it would be too large of a
-tangent for this post.  In short, it eases the composition of
-asynchronous programming patterns -- we have not defined any notion of
-composition yet, but think of stuff like awaiting the result of
-several computations that were logically launched simultaneously. This
-[[https://youtu.be/1Wy5sq3s2rg?t=1559][Lewis Baker talk on structured concurrency]] covers the issue quite
-well.
+tangent for this post.  In short, it eases the development and
+correctness verification of asynchronous programming patterns -- we
+have not defined any such pattern yet, but think of stuff like
+awaiting the result of several computations that were logically
+launched simultaneously. This [[https://youtu.be/1Wy5sq3s2rg?t=1559][Lewis Baker talk on structured
+concurrency]] covers the issue quite well.
 
 
 The transformation relies on /thunks/ to achieve the effect of
@@ -608,7 +608,122 @@ would be very naive to expect code like that of Listing
 [[listing:lazy-curried-cps-hypotenuse]] to be maintainable or even
 pleasant to read.
 
-** Higher Order CPS Functions and compositional patterns
+** Compositional patterns
+
+In Elements of Programming, a *computational basis* for a type is
+defined as the finite set of procedures that enable the construction
+of any other procedure on the type.  In other words, these procedures
+can be [[https://en.wikipedia.org/wiki/Function_composition_(computer_science)][functionally composed]] to obtain any other procedure on the
+type.  For example, for unsigned integers a computational basis could
+be =zero=, =operator===, and =successor= functions.  Efficiency is
+related, but we will ignore it for now.
+
+
+We can carry the notion of computational basis for types to
+computational basis for computation itself.  The procedures on
+computations are simply the compositional patterns that enable
+constructing larger computations from smaller ones.  A computational
+basis for computation is a finite set of compositional patterns from
+which every other compositional pattern can be obtained.
+
+
+Since the redex and continuations we have been abstracting over are a
+way to represent computations, these facts about compositional
+patterns and computational basis apply to the framework we have
+developed throughout the last few sections.  We can readily identify a
+basis in Listing [[listing:lazy-curried-cps-hypotenuse]]: lifting and
+sequencing.
+
+*** Lifting
+
+Lifting in the context of CPS occurs whenever we want to carry some
+information from the direct style world to the CPS world. In
+=hypotenuse= of Listing [[listing:lazy-curried-cps-hypotenuse]] this
+occurs to the redex arguments (used in =sq=, =add=, =sqr=).  The
+pattern is illustrated below.
+
+#+NAME: listing:just
+#+CAPTION: Lifting with =just=
+#+BEGIN_SRC C++ -n
+auto just(auto value) {
+  return [=](auto cc) {
+    return [=]() {
+      return cc(value);
+    };
+  };
+}
+#+END_SRC
+
+
+The code above is quite straightforward, the function =just= simply
+captures a value and forwards it to the user-provided callback.
+
+
+Before showing its usage in the running example, we need to develop
+the sequencing pattern.
+
+*** Sequencing
+
+
+#+NAME: listing:let_value
+#+CAPTION: Sequencing with =let_value=
+#+BEGIN_SRC C++ -n
+auto let_value(auto f_disconnected, auto g_nonconfig) {
+  return [=](auto cc) {
+    return [=]() {
+      auto f_connected = f_disconnected([=](auto f_ret) {
+        auto g_disconnected = g_nonconfig(f_ret);
+        auto g_connected = g_disconnected(cc);
+        return g_connected();
+      });
+      return f_connected();
+    };
+  };
+}
+#+END_SRC
+
+
+#+NAME: listing:then
+#+CAPTION: Mapping with =then=
+#+BEGIN_SRC C++ -n
+auto then(auto f_disconnected, auto map) {
+  return let_value(f_disconnected, [=](auto f_ret) {
+    return [=](auto cc) {
+      return [=]() {
+        return cc(map(f_ret));
+      };
+    };
+  });
+}
+#+END_SRC
+
+*** Refactored example
+
+
+#+NAME: listing:cps-compositional-patterns-hypotenuse
+#+CAPTION: Hypotenuse function written with CPS compositional patterns
+#+BEGIN_SRC C++ -n
+// mul_, add_, sqrt_ are the usual arithmetic operations.
+// binary operations taking a pair instead of two args
+
+auto sq(double x) {
+  return then(just(make_pair(x, x)), mul_);
+}
+auto add(double x, double y) {
+  return then(just(make_pair(x, y)), add_);
+}
+auto sqr(double x) {
+  return then(just(x), sqrt_);
+}
+auto hypotenuse(double x, double y) {
+  return let_value(sq(x), [=](double sqx) {
+    return let_value(sq(y), [=](double sqy) {
+      return let_value(add(sqx, sqy), [=](double r) {
+        return sqr(r); });
+    });
+  });
+}
+#+END_SRC
 
 ** Simplified =std::execution=
 
