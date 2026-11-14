@@ -704,11 +704,12 @@ understand the application of lazy curried CPS in the [[sec:laziness-and-thunks]
 section]].  Both parameters are functions written in lazy curried CPS,
 but =f_disconnected= has been already partially applied to its redex
 arguments by the time =let_value= is applied to it, while
-=g_nonconfig= has no arguments available to it.  =let_value= executes
-the computation enclosed by =f_disconnected= and forwards its result
-as the redex arguments of =g_nonconfig=, obtaining =g_disconnected=.
-Lastly, the callback argument of =let_value= is the attached to
-=g_disconnected=, obtaining a thunk which is immediately invoked.
+=g_nonconfig= has no arguments available to it.  When started,
+=let_value= executes the computation enclosed by =f_disconnected= and
+forwards its result as the redex arguments of =g_nonconfig=, obtaining
+=g_disconnected=.  The callback argument of =let_value= is then
+attached to =g_disconnected=, and the resulting thunk is immediately
+invoked.
 
 
 With =let_value= and =just= at hand, we can already improve the
@@ -781,23 +782,60 @@ last sections, are analogous in many ways to the control flow
 mechanism proposed by =std::execution=:
 
 - Callbacks are analogous to receivers.
-  - They are the channel through which results are propagated.
+  - Invoking =operator()= / =set_value= on them propagates results
+    through the execution.
 - Thunks are analogous to operation state.
   - They ensure redex arguments' lifetime until completion.
-  - Once called / =start()=-ed the redex is executed.
+  - Once called / =start=-ed the redex is executed.
 - Lazy curried CPS functions are analogous to senders.
   - They enclose computation, but do not execute it (lazy).
   - They are =connect=-ed to a callback / receiver.
-- Compositional patterns are analogous to sender adaptors.
-  - They take lazy curried CPS functions / senders and return lazy
-    curried CPS functions / senders.
+- Compositional patterns are analogous to sender algorithms.
+  - They are parameterized by lazy curried CPS functions / senders and
+    return lazy curried CPS functions / senders.
   - They describe the way in which computations are composed.
 
 We now translate the lazy curried CPS compositional patterns into a
-structure more alike that of =std::execution='s senders adaptors.
+structure more alike that of =std::execution='s sender algorithms.
+As a rule of thumb:
+
+- Appearances of lazy curried CPS functions are replaced by
+  appearances of senders.
+
+  - Wherever a lazy curried CPS function was applied to redex
+    arguments, a sender is created using the same arguments.
+
+  - Wherever a callback was passed as an argument to a disconnected
+    lazy curried CPS function, a receiver is passed as the argument of
+    a sender's =connect= member function.
+
+- Appearances of thunks are replaced by appearances of operation states.
+
+  - Wherever a thunk was invoked, an operation state is =start=-ed.
+
+- Appearances of callbacks get replaced by appearances of receivers.
+
+  - Wherever a callback was invoked, a receiver's =set_value= is
+    invoked.
+
+- Wherever an argument was captured, a member variable is initialized.
 
 *** Simplified =just=
 
+The most basic sender algorithm is =just=.  This algorithm is what
+=std::execution= refers to as a *sender factory*, meaning that it does
+not have any input sender and it produces a sender.  Input senders are
+typically denoted as /children senders/.  The /parent sender/ in this
+context is the sender returned by the sender algorithm that takes
+senders as input.  The largely common case (but not universal) in
+=std::execution= is that computation represented by children senders
+is executed before the computation represented by the parent sender.
+In any case, =just= has no children senders, so by definition nothing
+executes before it.
+
+
+#+NAME: listing:just-sender-factory
+#+CAPTION: =just= sender factory
 #+BEGIN_SRC C++
   namespace just_ {
     template<typename Rcv, typename T>
@@ -811,48 +849,138 @@ structure more alike that of =std::execution='s senders adaptors.
     struct snd {
       T x;
       template<typename Rcv>
-      auto connect(Rcv next) -> op<Rcv, T> { return {next, x}; }
+      op<Rcv, T> connect(Rcv next) { return {next, x}; }
     };
   } // namespace just_
 
-  static constexpr just = [](auto x) { return just_::snd(x); };
+  static constexpr auto just = [](auto x) { return just_::snd(x); };
+#+END_SRC
+
+
+The code in Listing [[listing:just-sender-factory]] above is a direct
+application of the recently stated rule of thumb to Listing
+[[listing:just]].  Because =just_::snd= has no children senders, it does
+not make sense for there to be a receiver =just_::rcv= -- there are no
+children senders to which it could be connected to.  In more general
+terms, a receiver is associated to a sender when the computation
+represented by the sender requires input data.  This is the case for
+the =then= algorithm, which we develop next.
+
+*** Simplified =then=
+
+
+#+NAME: listing:then-sender-adaptor
+#+CAPTION: =then= sender adaptor
+#+BEGIN_SRC C++
+  namespace then_ {
+    template<typename Op>
+    struct rcv {
+      Op* op;
+      void set_value(auto x) { return op->complete(x); }
+    };
+
+    template<typename Rcv, typename Prev, typename F>
+    struct op {
+      Rcv next;
+      Prev prev;
+      F f;
+
+      void start() {
+        auto op = prev.connect(rcv<op>{this});
+        op.start();
+      }
+
+      void complete(auto x) {
+        next.set_value(f(x));
+      }
+    };
+
+    template<typename Prev, typename F>
+    struct snd {
+      Prev prev;
+      F f;
+      template<typename Rcv>
+      op<Rcv, Prev, F> connect(Rcv next) { return {next, prev, f}; }
+    };
+  } // namespace then_
+
+  static constexpr auto then = [](auto prev, auto f) {
+    return then_::snd(prev, f);
+  };
 #+END_SRC
 
 *** Simplified =let_value=
 
 
 #+BEGIN_SRC C++
-  namespace let_value_ {
-    template<typename F>
-    struct first_rcv {
-      F f;
-      void set_value(auto x) { return f(x); }
+    namespace let_value_ {
+      template<typename Op>
+      struct intermediate_rcv {
+        Op* op;
+        void set_value(auto x) { return op->complete_intermediate(x); }
+      };
+
+      template<typename Rcv, typename Prev, typename MakeSnd>
+      struct op {
+        Rcv next;
+        Prev prev;
+        MakeSnd make_snd;
+
+        void start() {
+          auto op1 = prev.connect(intermediate_rcv<op>{this});
+          op1.start();
+        }
+
+        void complete_intermediate(auto x) {
+          auto op2 = make_snd(x).connect(next);
+          op2.start();
+        }
+      };
+
+      template<typename Prev, typename MakeSnd>
+      struct snd {
+        Prev prev;
+        MakeSnd make_snd;
+
+        template<typename Rcv>
+        op<Rcv, Prev, MakeSnd> connect(Rcv next) { return {next, prev, make_snd}; }
+      };
+    } // namespace let_value_
+
+    static constexpr auto let_value = [](auto prev, auto make_snd) {
+      return let_value_::snd(prev, make_snd);
     };
+#+END_SRC
 
-    template<typename Rcv, typename Prev, typename MakeSnd>
-    struct op {
-      Rcv next;
-      Prev prev;
-      MakeSnd make_snd;
 
-      void start() {
-        prev.connect(first_rcv{[this](auto first_result) {
-  	make_snd(first_result).connect(next).start();
-        }}).start();
-      }
+** What about =main=, again
+
+#+BEGIN_SRC C++
+  namespace sync_wait_ {
+    template<typename Ret>
+    struct rcv {
+      std::optional<Ret>* sink;
+      void set_value(Ret x) { sink->emplace(x); }
     };
+  } // namespace sync_wait_
 
-    template<typename Prev, typename MakeSnd>
-    struct snd {
-      Prev prev;
-      MakeSnd make_snd;
+  template<typename Ret>
+  Ret sync_wait(auto prev) {
+    std::optional<Ret> value;
+    auto op = prev.connect(sync_wait_::rcv<Ret>{&ret});
+    op.start();
+    assert(vaule.has_value() and "Completion did not populate return value");
+    return *value;
+  };
+#+END_SRC
 
-      template<typename Rcv>
-      auto connect(Rcv rcv) -> op<Rcv, Prev, MakeSnd> { return {rcv, prev, make_snd}; }
-    };
-  } // namespace let_value_
 
-  static constexpr let_value = [](auto prev, auto make_snd) { return let_value_::snd(prev, make_snd); };
+
+#+BEGIN_SRC C++
+  void main() {
+    auto result = sync_wait<double>(hypotenuse(2.0, 3.0));
+    std::println("{}", result);
+  }
 #+END_SRC
 
 
