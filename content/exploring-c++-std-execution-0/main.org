@@ -1021,10 +1021,10 @@ The =then= lazy curried CPS of Listing [[listing:then]], once invoked,
 attached a callback to the input invocable parameter and began
 execution of the resulting thunk.
 
-To do this using in =std::execution=, we would need a receiver
-associated to the =then= sender adaptor.  This receiver must be
-=connect=-ed to the child sender, resulting in an operation state that
-is immedately invoked.
+In the context of =std::execution=, the =then= adaptor would need an
+associated receiver.  This receiver must be =connect=-ed to the child
+sender of =then_::snd= when =then_::op::start= is invoked, resulting
+in an operation state that is immedately invoked.
 
 #+NAME: listing:then-sender-adaptor-step-2
 #+CAPTION: =then= sender adaptor (2 of N)
