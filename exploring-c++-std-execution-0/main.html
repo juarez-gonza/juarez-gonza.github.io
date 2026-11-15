@@ -21,40 +21,42 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org0691b9d">Computation and continuations</a>
+<li><a href="#org3d06dda">Computation and continuations</a>
 <ul>
-<li><a href="#orga883e03">Example 1: Arithmetic expressions</a></li>
-<li><a href="#org6ae971f">Example 2: Subsequent statements</a></li>
-<li><a href="#orge4f6359">Example 3: Function boundaries</a></li>
-<li><a href="#orga43ab83">Example 4: Conditional branches</a></li>
+<li><a href="#org76c7b62">Example 1: Arithmetic expressions</a></li>
+<li><a href="#org21433fe">Example 2: Subsequent statements</a></li>
+<li><a href="#org591ce5e">Example 3: Function boundaries</a></li>
+<li><a href="#org9b69c42">Example 4: Conditional branches</a></li>
 </ul>
 </li>
-<li><a href="#org49479a5">Continuation Passing Style</a>
+<li><a href="#orgfff1fae">Continuation Passing Style</a>
 <ul>
-<li><a href="#org82ebf5e">What about <code>main</code></a></li>
+<li><a href="#org955fe6e">What about <code>main</code>?</a></li>
 </ul>
 </li>
-<li><a href="#orgb0ca8a9">From CPS to <code>std::execution</code></a>
+<li><a href="#org464a933">From CPS to <code>std::execution</code></a>
 <ul>
-<li><a href="#orga80e742">Currying the callback arguments</a></li>
-<li><a href="#orgb162df6">Laziness and thunks</a></li>
-<li><a href="#orgab5d0eb">Compositional patterns</a>
+<li><a href="#org4e76d7b">Currying the callback arguments</a></li>
+<li><a href="#org094bb31">Laziness and thunks</a></li>
+<li><a href="#orge69203a">Compositional patterns</a>
 <ul>
-<li><a href="#orgfdb7386">Lifting</a></li>
-<li><a href="#org98e3cd8">Sequencing</a></li>
+<li><a href="#org1f10ae0">Lifting</a></li>
+<li><a href="#org7c41942">Sequencing</a></li>
+<li><a href="#orgea2184b">Mapping</a></li>
+<li><a href="#org0692e38">What about main? Revisited</a></li>
 </ul>
 </li>
-<li><a href="#orgc813a9d">Simplified <code>std::execution</code></a>
+</ul>
+</li>
+<li><a href="#orgf3e1687">Simplified <code>std::execution</code></a>
 <ul>
-<li><a href="#orgc8396b8">Simplified <code>just</code></a></li>
-<li><a href="#org882b5ad">Simplified <code>then</code></a></li>
-<li><a href="#org1ecc40a">Simplified <code>let_value</code></a></li>
+<li><a href="#org4a014a2">Simplified <code>just</code></a></li>
+<li><a href="#org3c9fd48">Simplified <code>then</code></a></li>
+<li><a href="#org4fe19eb">Simplified <code>let_value</code></a></li>
+<li><a href="#orgb97f79e">What about <code>main</code>? Re-revisited</a></li>
 </ul>
 </li>
-<li><a href="#orgc632c35">What about <code>main</code>, again</a></li>
-</ul>
-</li>
-<li><a href="#org2393576">Conclusions</a></li>
+<li><a href="#orgb6688b0">Conclusions</a></li>
 </ul>
 </div>
 </div>
@@ -84,9 +86,9 @@ computation under a simplified <code>std::execution</code> framework.  We will
 add complexity to the framework as the series progresses, slowly
 converging to <code>std::execution</code> as proposed for standardization.
 </p>
-<div id="outline-container-org0691b9d" class="outline-2">
-<h2 id="org0691b9d">Computation and continuations</h2>
-<div class="outline-text-2" id="text-org0691b9d">
+<div id="outline-container-org3d06dda" class="outline-2">
+<h2 id="org3d06dda">Computation and continuations</h2>
+<div class="outline-text-2" id="text-org3d06dda">
 <p>
 A computation can be intuitively defined as a process by which some
 inputs are converted into some outputs by executing a set of steps one
@@ -112,9 +114,9 @@ abstraction level at which we would like to apply these ideas.  The
 following examples should clarify the situation.
 </p>
 </div>
-<div id="outline-container-orga883e03" class="outline-3">
-<h3 id="orga883e03">Example 1: Arithmetic expressions</h3>
-<div class="outline-text-3" id="text-orga883e03">
+<div id="outline-container-org76c7b62" class="outline-3">
+<h3 id="org76c7b62">Example 1: Arithmetic expressions</h3>
+<div class="outline-text-3" id="text-org76c7b62">
 <p>
 Given the expression <code>1 + 2 * 3</code>, the usual precedence rules tell us
 that the first step to be executed is <code>2 * 3</code>.  That is, <code>2 * 3</code> is
@@ -146,9 +148,9 @@ is applied (<code>1</code>).
 </p>
 </div>
 </div>
-<div id="outline-container-org6ae971f" class="outline-3">
-<h3 id="org6ae971f">Example 2: Subsequent statements</h3>
-<div class="outline-text-3" id="text-org6ae971f">
+<div id="outline-container-org21433fe" class="outline-3">
+<h3 id="org21433fe">Example 2: Subsequent statements</h3>
+<div class="outline-text-3" id="text-org21433fe">
 <p>
 There is no reason to limit the abstraction level of "steps" just to
 arithmetic expressions.  We could take a step to be a statement.  The
@@ -162,7 +164,7 @@ Consider
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 1: </span>Example 2</label><pre class="src src-C++" id="org908e0f4"><span class="linenr">1: </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = x * x;
+<label class="org-src-name"><span class="listing-number">Listing 1: </span>Example 2</label><pre class="src src-C++" id="org47da163"><span class="linenr">1: </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = x * x;
 <span class="linenr">2: </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqy</span> = y * y;
 <span class="linenr">3: </span><span class="org-keyword">auto</span> <span class="org-variable-name">r</span> = sqx + sqy;
 </pre>
@@ -181,9 +183,9 @@ consistent.
 </p>
 </div>
 </div>
-<div id="outline-container-orge4f6359" class="outline-3">
-<h3 id="orge4f6359">Example 3: Function boundaries</h3>
-<div class="outline-text-3" id="text-orge4f6359">
+<div id="outline-container-org591ce5e" class="outline-3">
+<h3 id="org591ce5e">Example 3: Function boundaries</h3>
+<div class="outline-text-3" id="text-org591ce5e">
 <p>
 So far none of the examples have function calls in them, but this does
 not have to be the case.  Given the function <code>hypotenuse</code> as defined
@@ -191,7 +193,7 @@ below
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 2: </span>Example 3</label><pre class="src src-C++" id="org0d79312"><span class="linenr">1: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+<label class="org-src-name"><span class="listing-number">Listing 2: </span>Example 3</label><pre class="src src-C++" id="org58ce969"><span class="linenr">1: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
 <span class="linenr">2: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = sq(x);
 <span class="linenr">3: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqy</span> = sq(y);
 <span class="linenr">4: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">r</span> = add(sqx, sqy);
@@ -221,11 +223,11 @@ some more key properties of continuations.
 </p>
 </div>
 </div>
-<div id="outline-container-orga43ab83" class="outline-3">
-<h3 id="orga43ab83">Example 4: Conditional branches</h3>
-<div class="outline-text-3" id="text-orga43ab83">
+<div id="outline-container-org9b69c42" class="outline-3">
+<h3 id="org9b69c42">Example 4: Conditional branches</h3>
+<div class="outline-text-3" id="text-org9b69c42">
 <p>
-<a id="orgcedfd46"></a>
+<a id="org543673e"></a>
 </p>
 
 <p>
@@ -235,7 +237,7 @@ to determine the continuation?
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 3: </span>Example 4</label><pre class="src src-C++" id="orgf930eab"><span class="linenr">1: </span><span class="org-keyword">if</span> (rand() % 2) {
+<label class="org-src-name"><span class="listing-number">Listing 3: </span>Example 4</label><pre class="src src-C++" id="org4a8f3a0"><span class="linenr">1: </span><span class="org-keyword">if</span> (rand() % 2) {
 <span class="linenr">2: </span>  <span class="org-keyword">return</span> foo();
 <span class="linenr">3: </span>} <span class="org-keyword">else</span> {
 <span class="linenr">4: </span>  <span class="org-keyword">return</span> bar();
@@ -260,9 +262,9 @@ runtime information.
 </div>
 </div>
 </div>
-<div id="outline-container-org49479a5" class="outline-2">
-<h2 id="org49479a5">Continuation Passing Style</h2>
-<div class="outline-text-2" id="text-org49479a5">
+<div id="outline-container-orgfff1fae" class="outline-2">
+<h2 id="orgfff1fae">Continuation Passing Style</h2>
+<div class="outline-text-2" id="text-orgfff1fae">
 <p>
 Continuations as shown in the examples so far are not very
 interesting.  We have identified them as part of the structure of
@@ -282,8 +284,8 @@ program transformation throughout the whole program:
 <ol class="org-ol">
 <li>Start from the beginning of the program</li>
 <li>Recognize the redex and its continuation.</li>
-<li><a id="orge3c866d"></a>Replace the redex by a <i>CPS function</i> (see Listing
-<a href="#org885a783">4</a>). This function:
+<li><a id="org48d2cac"></a>Replace the redex by a <i>CPS function</i> (see Listing
+<a href="#orgc6763ed">4</a>). This function:
 <ol class="org-ol">
 <li>Takes the parameters needed to execute the redex.</li>
 <li>Takes one extra invocable parameter per continuation.  These are
@@ -297,8 +299,8 @@ associated to one of the continuations in the original code.  If
 the associated continuation is empty, then the body of the lambda
 just returns its argument (i.e., it is the identity function).  Otherwise, the body of the lambda
 corresponds to the steps of the associated continuation (see
-Listing <a href="#org2e54199">5</a>).</li>
-<li><a id="org7ac932b"></a> For each non-identity lambda created in
+Listing <a href="#org16c98e4">5</a>).</li>
+<li><a id="org0a74247"></a> For each non-identity lambda created in
 step 4, repeat from step 2 using as starting point the first
 statement of the lambda.</li>
 </ol>
@@ -311,7 +313,7 @@ to CPS.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 4: </span>Direct style to Continuation Passing Style: Callee</label><pre class="src src-C++" id="org885a783"><span class="org-comment-delimiter">// </span><span class="org-comment">Original code: Direct Style
+<label class="org-src-name"><span class="listing-number">Listing 4: </span>Direct style to Continuation Passing Style: Callee</label><pre class="src src-C++" id="orgc6763ed"><span class="org-comment-delimiter">// </span><span class="org-comment">Original code: Direct Style
 </span><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> x * x; }
 
 <span class="org-comment-delimiter">// </span><span class="org-comment">After step 3: Continuation Passing Style
@@ -321,7 +323,7 @@ to CPS.
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 5: </span>Direct style to Continuation Passing Style: Caller</label><pre class="src src-C++" id="org2e54199"><span class="org-comment-delimiter">// </span><span class="org-comment">Original code: Direct Style
+<label class="org-src-name"><span class="listing-number">Listing 5: </span>Direct style to Continuation Passing Style: Caller</label><pre class="src src-C++" id="org16c98e4"><span class="org-comment-delimiter">// </span><span class="org-comment">Original code: Direct Style
 </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = sq(x);
 <span class="org-keyword">return</span> foo(sqx);
 
@@ -332,14 +334,14 @@ to CPS.
 
 
 <p>
-<a href="#org7ac932b">Step 5</a> states the iteration tactic of the transformation.  To
+<a href="#org0a74247">Step 5</a> states the iteration tactic of the transformation.  To
 illustrate the result of such iteration, let us apply the procedure to
-the <code>hypotenuse</code> example &#x2013; extended in Listing <a href="#org25a017c">6</a>
+the <code>hypotenuse</code> example &#x2013; extended in Listing <a href="#org1cf5f40">6</a>
 with the definitions of <code>sq</code>, <code>add</code>, and <code>sqr</code>.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 6: </span>Hypotenuse function written in direct style</label><pre class="src src-C++" id="org25a017c"><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> x * x; }
+<label class="org-src-name"><span class="listing-number">Listing 6: </span>Hypotenuse function written in direct style</label><pre class="src src-C++" id="org1cf5f40"><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> x * x; }
 <span class="org-type">double</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> x + y; }
 <span class="org-type">double</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> sqrt(x); }
 <span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
@@ -356,7 +358,7 @@ This yields
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 7: </span>Hypotenuse function written in CPS</label><pre class="src src-C++" id="orgd2b6025"><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }
+<label class="org-src-name"><span class="listing-number">Listing 7: </span>Hypotenuse function written in CPS</label><pre class="src src-C++" id="org3b2d94a"><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }
 <span class="org-type">double</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x + y); }
 <span class="org-type">double</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(sqrt(x)); }
 <span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
@@ -390,13 +392,17 @@ while the redex is executed.  Once completion of the redex is signaled
 can be retrived and applied to the result of the redex.
 </p>
 </div>
-<div id="outline-container-org82ebf5e" class="outline-3">
-<h3 id="org82ebf5e">What about <code>main</code></h3>
-<div class="outline-text-3" id="text-org82ebf5e">
+<div id="outline-container-org955fe6e" class="outline-3">
+<h3 id="org955fe6e">What about <code>main</code>?</h3>
+<div class="outline-text-3" id="text-org955fe6e">
+<p>
+<a id="org4deeef8"></a>
+</p>
+
 <p>
 In the ideal CPS world, everything in a program that is written in CPS
 takes these callback arguments (there can be more than one callback,
-see <a href="#orgcedfd46">Example 4</a> and apply the CPS transform).  But most of us have to
+see <a href="#org543673e">Example 4</a> and apply the CPS transform).  But most of us have to
 deal with <code>main</code> being the entry point of our programs.  The signature
 of <code>main</code> cannot be modified, putting it at odds with our idealized
 CPS world.  The solution is simple: <code>main</code> acts as a barrier between
@@ -404,7 +410,7 @@ the CPS world and the direct style world.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 8: </span>Bridging CPS and direct style in <code>main</code></label><pre class="src src-C++" id="orge4d7464"><span class="org-type">void</span> <span class="org-function-name">main</span>() {
+<label class="org-src-name"><span class="listing-number">Listing 8: </span>Bridging CPS and direct style in <code>main</code></label><pre class="src src-C++" id="org2f99725"><span class="org-type">void</span> <span class="org-function-name">main</span>() {
   <span class="org-constant">std</span>::<span class="org-type">optional</span>&lt;<span class="org-type">double</span>&gt; <span class="org-variable-name">result</span>;
   hypotenuse(2.0, 3.0, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">res</span>) { result = res; });
   <span class="org-constant">std</span>::println(<span class="org-string">"{}"</span>, *result);
@@ -419,9 +425,9 @@ should be used to this feeling.
 </div>
 </div>
 </div>
-<div id="outline-container-orgb0ca8a9" class="outline-2">
-<h2 id="orgb0ca8a9">From CPS to <code>std::execution</code></h2>
-<div class="outline-text-2" id="text-orgb0ca8a9">
+<div id="outline-container-org464a933" class="outline-2">
+<h2 id="org464a933">From CPS to <code>std::execution</code></h2>
+<div class="outline-text-2" id="text-org464a933">
 <p>
 We are still a couple of program transformations away from the
 simplified <code>std::execution</code> framework that was promised by the
@@ -430,15 +436,15 @@ less contrived than the CPS transform, but provide relevant features
 to the framework.
 </p>
 </div>
-<div id="outline-container-orga80e742" class="outline-3">
-<h3 id="orga80e742">Currying the callback arguments</h3>
-<div class="outline-text-3" id="text-orga80e742">
+<div id="outline-container-org4e76d7b" class="outline-3">
+<h3 id="org4e76d7b">Currying the callback arguments</h3>
+<div class="outline-text-3" id="text-org4e76d7b">
 <p>
-<a id="org9fe2be6"></a>
+<a id="orgdc5389d"></a>
 </p>
 
 <p>
-The CPS function, created at <a href="#orge3c866d">step 3</a> of the CPS transform, holds two
+The CPS function, created at <a href="#org48d2cac">step 3</a> of the CPS transform, holds two
 kinds of parameters:
 </p>
 
@@ -453,12 +459,12 @@ kinds of parameters:
 The purpose of the next transformation is to refactor CPS functions in
 order gain a clear separation between these two kinds of arguments.
 <a href="https://en.wikipedia.org/wiki/Currying">Currying</a> the callback arguments achieves this goal (see Listing
-<a href="#orgb44dd77">9</a> and <a href="#org62d9d69">10</a>).
+<a href="#orgb09883f">9</a> and <a href="#org452f0bd">10</a>).
 </p>
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 9: </span>CPS to curried CPS: Callee</label><pre class="src src-C++" id="orgb44dd77"><span class="org-comment-delimiter">// </span><span class="org-comment">CPS
+<label class="org-src-name"><span class="listing-number">Listing 9: </span>CPS to curried CPS: Callee</label><pre class="src src-C++" id="orgb09883f"><span class="org-comment-delimiter">// </span><span class="org-comment">CPS
 </span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }
 
 <span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
@@ -468,7 +474,7 @@ order gain a clear separation between these two kinds of arguments.
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 10: </span>CPS to curried CPS: Caller</label><pre class="src src-C++" id="org62d9d69"><span class="org-comment-delimiter">// </span><span class="org-comment">CPS
+<label class="org-src-name"><span class="listing-number">Listing 10: </span>CPS to curried CPS: Caller</label><pre class="src src-C++" id="org452f0bd"><span class="org-comment-delimiter">// </span><span class="org-comment">CPS
 </span><span class="org-keyword">return</span> sq(x, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> foo(sqx); });
 
 <span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
@@ -480,11 +486,11 @@ order gain a clear separation between these two kinds of arguments.
 <p>
 An important detail (at risk of being lost to its concise syntax) is
 that the implementation of the curried CPS function (Listing
-<a href="#orgb44dd77">9</a>) returns a lambda that captures the
+<a href="#orgb09883f">9</a>) returns a lambda that captures the
 function's arguments <i>by value</i>.  There is no other choice than to
 capture by value because references to the arguments dangle as soon as
 the curried CPS function returns.  On the other hand, the call-site
-(Listing <a href="#org62d9d69">10</a>) can create a callback that captures
+(Listing <a href="#org452f0bd">10</a>) can create a callback that captures
 by reference because continuation passing style ensures the callback
 is invoked before the call expression is fully evaluated.
 </p>
@@ -492,11 +498,11 @@ is invoked before the call expression is fully evaluated.
 
 <p>
 Currying the CPS <code>hypotenuse</code> example of Listing
-<a href="#orgd2b6025">7</a>, yields the following.
+<a href="#org3b2d94a">7</a>, yields the following.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 11: </span>Hypotenuse function written in curried CPS</label><pre class="src src-C++" id="org98dec95"><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }; }
+<label class="org-src-name"><span class="listing-number">Listing 11: </span>Hypotenuse function written in curried CPS</label><pre class="src src-C++" id="org6194a6c"><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }; }
 <span class="org-keyword">auto</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x + y); }; }
 <span class="org-keyword">auto</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(sqrt(x)); }; }
 <span class="org-keyword">auto</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
@@ -556,7 +562,7 @@ is resolved, one of the callbacks is applied to its result.</li>
 
 <div style="text-align: center;">
 
-<div id="org2baa7ab" class="figure">
+<div id="org09dccdf" class="figure">
 <p><img src="images/curried-cps.png" alt="curried-cps.png" />
 </p>
 </div>
@@ -573,11 +579,11 @@ used throughout <code>std::execution</code>.
 </p>
 </div>
 </div>
-<div id="outline-container-orgb162df6" class="outline-3">
-<h3 id="orgb162df6">Laziness and thunks</h3>
-<div class="outline-text-3" id="text-orgb162df6">
+<div id="outline-container-org094bb31" class="outline-3">
+<h3 id="org094bb31">Laziness and thunks</h3>
+<div class="outline-text-3" id="text-org094bb31">
 <p>
-<a id="org01994ef"></a>
+<a id="org3291757"></a>
 </p>
 
 <p>
@@ -610,7 +616,7 @@ applied to curried CPS functions is depicted in the listings below.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 12: </span>Curried CPS to lazy curried CPS: Callee</label><pre class="src src-C++" id="org5b4e2ea"><span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
+<label class="org-src-name"><span class="listing-number">Listing 12: </span>Curried CPS to lazy curried CPS: Callee</label><pre class="src src-C++" id="org4bad064"><span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
 </span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }; }
 
 <span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS
@@ -620,7 +626,7 @@ applied to curried CPS functions is depicted in the listings below.
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 13: </span>Curried CPS to lazy curried CPS: Caller</label><pre class="src src-C++" id="orgfac8fab"><span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
+<label class="org-src-name"><span class="listing-number">Listing 13: </span>Curried CPS to lazy curried CPS: Caller</label><pre class="src src-C++" id="org336f3b0"><span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
 </span><span class="org-keyword">return</span> sq(x)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> foo(sqx); });
 
 <span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS
@@ -630,18 +636,18 @@ applied to curried CPS functions is depicted in the listings below.
 
 
 <p>
-Just like the curried callback parameter in the <a href="#orgb44dd77">previous section</a>, the
+Just like the curried callback parameter in the <a href="#orgb09883f">previous section</a>, the
 thunk must capture by value.  This is to prevent dangling of both
 redex and callback arguments.  Call-site rules change, however.
 Before thunks callbacks created at call-site could capture by
 reference safely.  Now only the caller that invokes the thunk can do
 so.  The problematic case is depicted in Listing
-<a href="#org275ca45">14</a>.
+<a href="#org641e581">14</a>.
 </p>
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 14: </span>Lazy curried CPS dangling at call-site</label><pre class="src src-C++" id="org275ca45"><span class="org-comment-delimiter">/* </span><span class="org-comment">thunk_type</span><span class="org-comment-delimiter"> */</span> <span class="org-keyword">auto</span> <span class="org-function-name">sq_plus</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+<label class="org-src-name"><span class="listing-number">Listing 14: </span>Lazy curried CPS dangling at call-site</label><pre class="src src-C++" id="org641e581"><span class="org-comment-delimiter">/* </span><span class="org-comment">thunk_type</span><span class="org-comment-delimiter"> */</span> <span class="org-keyword">auto</span> <span class="org-function-name">sq_plus</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
   <span class="org-keyword">return</span> sq(x)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> sqx + y; });
 } <span class="org-comment-delimiter">// </span><span class="org-comment">ERROR! The callback has not been invoked yet, `y` has been destructed</span>
 </pre>
@@ -653,11 +659,11 @@ In code that executes a sequence of lazy curried CPS functions, thunks
 require an invocation after each callback attachment.  This leads to a
 sort of <i>chain reaction</i> through the sequenced operations: the
 completion of one operation immediately starts the next one, as shown
-in Listing <a href="#org236c880">15</a>.
+in Listing <a href="#org472e324">15</a>.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 15: </span>Hypotenuse function written in lazy curried CPS</label><pre class="src src-C++" id="org236c880"><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(x * x); }; }; }
+<label class="org-src-name"><span class="listing-number">Listing 15: </span>Hypotenuse function written in lazy curried CPS</label><pre class="src src-C++" id="org472e324"><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(x * x); }; }; }
 <span class="org-keyword">auto</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(x + y); }; }; }
 <span class="org-keyword">auto</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(sqrt(x)); }; }; }
 <span class="org-keyword">auto</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
@@ -722,7 +728,7 @@ to its result.</li>
 
 <div style="text-align: center;">
 
-<div id="org39267a5" class="figure">
+<div id="org3a3be89" class="figure">
 <p><img src="images/lazy-curried-cps.png" alt="lazy-curried-cps.png" />
 </p>
 </div>
@@ -734,14 +740,14 @@ to its result.</li>
 At this point the simplified framework has almost everything it needs,
 functionally at least.  We still need to deal with its ugliness, as it
 would be very naive to expect code like that of Listing
-<a href="#org236c880">15</a> to be maintainable or even
+<a href="#org472e324">15</a> to be maintainable or even
 pleasant to read.
 </p>
 </div>
 </div>
-<div id="outline-container-orgab5d0eb" class="outline-3">
-<h3 id="orgab5d0eb">Compositional patterns</h3>
-<div class="outline-text-3" id="text-orgab5d0eb">
+<div id="outline-container-orge69203a" class="outline-3">
+<h3 id="orge69203a">Compositional patterns</h3>
+<div class="outline-text-3" id="text-orge69203a">
 <p>
 In Elements of Programming, a <b>computational basis</b> for a type is
 defined as the finite set of procedures that enable the construction
@@ -769,26 +775,26 @@ Since the redex and continuations we have been abstracting over are a
 way to represent computations, these facts about compositional
 patterns and computational basis apply to the framework we have
 developed throughout the last few sections.  We can readily identify a
-basis in Listing <a href="#org236c880">15</a>: lifting and
+basis in Listing <a href="#org472e324">15</a>: lifting and
 sequencing.  We will use these patterns to remove noise from the
 running example, making it more maintainable and aesthetically
 pleasing.
 </p>
 </div>
-<div id="outline-container-orgfdb7386" class="outline-4">
-<h4 id="orgfdb7386">Lifting</h4>
-<div class="outline-text-4" id="text-orgfdb7386">
+<div id="outline-container-org1f10ae0" class="outline-4">
+<h4 id="org1f10ae0">Lifting</h4>
+<div class="outline-text-4" id="text-org1f10ae0">
 <p>
 Lifting in the context of CPS occurs whenever we want to carry some
 data from the direct style world to the CPS world. In Listing
-<a href="#org236c880">15</a> this occurs to the arguments of
+<a href="#org472e324">15</a> this occurs to the arguments of
 <code>hypotenuse</code>, which are lifted in <code>sq</code>, <code>add</code>, <code>sqr</code> before their
 usage in the redex expressions.  The general pattern is implemented in
 the listing below.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 16: </span>Lifting with <code>just</code></label><pre class="src src-C++" id="org75454ff"><span class="org-keyword">auto</span> <span class="org-function-name">just</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">value</span>) {
+<label class="org-src-name"><span class="listing-number">Listing 16: </span>Lifting with <code>just</code></label><pre class="src src-C++" id="orga77af81"><span class="org-keyword">auto</span> <span class="org-function-name">just</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">value</span>) {
   <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
     <span class="org-keyword">return</span> [=]() {
       <span class="org-keyword">return</span> cc(value);
@@ -806,17 +812,17 @@ user-provided callback.
 </p>
 </div>
 </div>
-<div id="outline-container-org98e3cd8" class="outline-4">
-<h4 id="org98e3cd8">Sequencing</h4>
-<div class="outline-text-4" id="text-org98e3cd8">
+<div id="outline-container-org7c41942" class="outline-4">
+<h4 id="org7c41942">Sequencing</h4>
+<div class="outline-text-4" id="text-org7c41942">
 <p>
 A basic compositional pattern between computations is using the
 outputs of one computation as the inputs of the next computation.  The
-function in Listing <a href="#org35dc4b7">17</a>, <code>let_value</code>, captures this pattern.
+function in Listing <a href="#org0c176c8">17</a>, <code>let_value</code>, captures this pattern.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 17: </span>Sequencing with <code>let_value</code></label><pre class="src src-C++" id="org35dc4b7"><span class="org-keyword">auto</span> <span class="org-function-name">let_value</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">g_nonconfig</span>) {
+<label class="org-src-name"><span class="listing-number">Listing 17: </span>Sequencing with <code>let_value</code></label><pre class="src src-C++" id="org0c176c8"><span class="org-keyword">auto</span> <span class="org-function-name">let_value</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">g_nonconfig</span>) {
   <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
     <span class="org-keyword">return</span> [=]() {
       <span class="org-keyword">auto</span> <span class="org-variable-name">f_connected</span> = f_disconnected([=](<span class="org-keyword">auto</span> <span class="org-variable-name">f_ret</span>) {
@@ -834,8 +840,8 @@ function in Listing <a href="#org35dc4b7">17</a>, <code>let_value</code>, captur
 
 <p>
 The names chosen for the parameters and variables of Listing
-<a href="#org35dc4b7">17</a> reference the states of the state machine used to
-understand the application of lazy curried CPS in the <a href="#org01994ef">previous
+<a href="#org0c176c8">17</a> reference the states of the state machine used to
+understand the application of lazy curried CPS in the <a href="#org3291757">previous
 section</a>.  Both parameters are functions written in lazy curried CPS,
 but <code>f_disconnected</code> has been already partially applied to its redex
 arguments by the time <code>let_value</code> is applied to it, while
@@ -851,12 +857,12 @@ invoked.
 <p>
 With <code>let_value</code> and <code>just</code> at hand, we can already improve the
 readability of the running example quite a bit. Listing
-<a href="#orgeced1bc">18</a> shows the refactor of <code>sq</code>.
+<a href="#org17f4385">18</a> shows the refactor of <code>sq</code>.
 </p>
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 18: </span>Refactor of <code>sq</code> with <code>let_value</code> and <code>just</code></label><pre class="src src-C++" id="orgeced1bc"><span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS
+<label class="org-src-name"><span class="listing-number">Listing 18: </span>Refactor of <code>sq</code> with <code>let_value</code> and <code>just</code></label><pre class="src src-C++" id="org17f4385"><span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS
 </span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(x * x); }; }; }
 
 <span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS with let_value and just
@@ -869,34 +875,59 @@ readability of the running example quite a bit. Listing
 </div>
 
 <p>
-Now the callback argument and the two lambdas corresponding to the
-currying of the callback parameter and the thunk are implicit. But
-this can be further improved. The usage pattern of <code>mul_</code> is common to
-<code>sq</code>, <code>add</code>, <code>sqr</code> and it is captured by the <code>then</code> algorithm.  This
-algorithm can be seen as a sort of lifting, like <code>just</code>, but for
-mapping functions (functions suitable for <code>std::transform</code>).
+In the resulting code, the mechanism by which lazy curried CPS works
+is made implicit, giving more exposure to the computations themselves
+and the way in which they compose.  Just like using STL algorithms
+makes the intent of code clearer than the equivalent code using raw
+loops, we argue that code that uses compositional patterns makes the
+intent of code clearer than the equivalent using raw CPS.  This claim
+might make more sense once we show the full <code>hypotenuse</code> example
+refactored, after developing the <code>then</code> algorithm in the next section.
+</p>
+</div>
+</div>
+<div id="outline-container-orgea2184b" class="outline-4">
+<h4 id="orgea2184b">Mapping</h4>
+<div class="outline-text-4" id="text-orgea2184b">
+<p>
+The compositional pattern between <code>sq</code> and <code>mul_</code> in the <a href="#org17f4385">previous
+section</a> is common to <code>sq</code>, <code>add</code>, and <code>sqr</code>.  It is captured by the
+<code>then</code> algorithm.  This algorithm can be seen as a lifting from direct
+style to CPS, like <code>just</code>, but for mapping functions (functions
+suitable for <code>std::transform</code>).  Its only purpose is to apply a
+mapping function to the output of a previous computation before
+forwarding the mapped value as input of the next computation.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 19: </span>Mapping with <code>then</code></label><pre class="src src-C++" id="org1d2be90"><span class="org-keyword">auto</span> <span class="org-function-name">then</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">map</span>) {
-  <span class="org-keyword">return</span> let_value(f_disconnected, [=](<span class="org-keyword">auto</span> <span class="org-variable-name">f_ret</span>) {
-    <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
-      <span class="org-keyword">return</span> [=]() {
-        <span class="org-keyword">return</span> cc(<span class="org-type">map</span>(<span class="org-variable-name">f_ret</span>));
-      };
+<label class="org-src-name"><span class="listing-number">Listing 19: </span>Mapping with <code>then</code></label><pre class="src src-C++" id="org28e98d4"><span class="org-keyword">auto</span> <span class="org-function-name">then</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">map</span>) {
+  <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
+    <span class="org-keyword">return</span> [=]() {
+      <span class="org-keyword">return</span> f_disconnected([](<span class="org-keyword">auto</span> <span class="org-variable-name">x</span>) {
+        <span class="org-keyword">return</span> cc(<span class="org-type">map</span>(<span class="org-variable-name">x</span>));
+      })();
     };
-  });
+  };
 }
 </pre>
 </div>
 
 <p>
+The <code>then</code> algorithm can be implemented in terms of <code>let_value</code>.
+Meaning it should not be an element of a minimal computational basis
+if <code>let_value</code> is already a member of such basis.  Regardless, it
+often makes sense to implement <code>then</code> independently of <code>let_value</code>
+for efficiency reasons.
+</p>
+
+
+<p>
 The running example, after applying these compositional patterns, is
-shown in Listing <a href="#org712b150">20</a>.
+shown in Listing <a href="#org55a0c48">20</a>.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 20: </span>Hypotenuse function written with CPS compositional patterns</label><pre class="src src-C++" id="org712b150"><span class="org-comment-delimiter">// </span><span class="org-comment">mul_, add_, sqrt_ are the usual arithmetic operations.
+<label class="org-src-name"><span class="listing-number">Listing 20: </span>Hypotenuse function written with CPS compositional patterns</label><pre class="src src-C++" id="org55a0c48"><span class="org-comment-delimiter">// </span><span class="org-comment">mul_, add_, sqrt_ are the usual arithmetic operations.
 </span><span class="org-comment-delimiter">// </span><span class="org-comment">binary operations taking a pair instead of two args
 </span>
 <span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> then(just(make_pair(x, x)), mul_); }
@@ -915,10 +946,54 @@ shown in Listing <a href="#org712b150">20</a>.
 </div>
 </div>
 </div>
+<div id="outline-container-org0692e38" class="outline-4">
+<h4 id="org0692e38">What about main? Revisited</h4>
+<div class="outline-text-4" id="text-org0692e38">
+<p>
+We have already discussed about <code>main</code> being a bridge between direct
+style and CPS.  The compositional pattern that achieves this
+"bridging" is <code>sync_wait</code>.  Its implementation simply triggers the
+thunk of the previous computation after attaching a callback that
+"leaks" the result of the previous computation into the direct style
+world (see Listing <a href="#org29916c5">21</a>).
+</p>
+
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 21: </span>Back to direct style with <code>sync_wait</code></label><pre class="src src-C++" id="org29916c5"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Ret</span>&gt;
+<span class="org-type">Ret</span> <span class="org-function-name">sync_wait</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>) {
+  <span class="org-constant">std</span>::<span class="org-type">optional</span>&lt;<span class="org-type">Ret</span>&gt; <span class="org-variable-name">value</span>;
+  <span class="org-keyword">auto</span> <span class="org-variable-name">thunk</span> = f_disconnected([&amp;](<span class="org-type">Ret</span> <span class="org-variable-name">x</span>) { value.emplace(x); });
+  thunk();
+  assert(value.has_value() <span class="org-keyword">and</span> <span class="org-string">"Completion did not populate return value"</span>);
+  <span class="org-keyword">return</span> *value;
+}
+</pre>
 </div>
-<div id="outline-container-orgc813a9d" class="outline-3">
-<h3 id="orgc813a9d">Simplified <code>std::execution</code></h3>
-<div class="outline-text-3" id="text-orgc813a9d">
+
+
+<p>
+Its usage is indistinguishable from a regular direct style function
+call, with the particularity that the type of the result of the
+computation must be known ahead of time because at this point there is
+no way for it to deduce it automatically.
+</p>
+
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 22: </span><code>main</code> with <code>sync_wait</code></label><pre class="src src-C++" id="orgf12ad17"><span class="org-type">void</span> <span class="org-function-name">main</span>() {
+  <span class="org-keyword">auto</span> <span class="org-variable-name">result</span> = sync_wait&lt;<span class="org-type">double</span>&gt;(hypotenuse(2.0, 3.0));
+  <span class="org-constant">std</span>::println(<span class="org-string">"{}"</span>, result);
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-orgf3e1687" class="outline-2">
+<h2 id="orgf3e1687">Simplified <code>std::execution</code></h2>
+<div class="outline-text-2" id="text-orgf3e1687">
 <p>
 Compositional patterns over lazy curried CPS, as developed over the
 last sections, are analogous in many ways to the control flow
@@ -950,137 +1025,212 @@ return lazy curried CPS functions / senders.</li>
 </ul>
 
 <p>
-We now translate the lazy curried CPS compositional patterns into a
-structure more alike that of <code>std::execution</code>'s sender algorithms.
-As a rule of thumb:
+We now procede to translate the developed compositional patterns into
+a structure more alike that of <code>std::execution</code>'s sender algorithms,
+while we explain some of <code>std::execution</code> core terminology.
 </p>
-
-<ul class="org-ul">
-<li>Appearances of lazy curried CPS functions are replaced by
-appearances of senders.
-
-<ul class="org-ul">
-<li>Wherever a lazy curried CPS function was applied to redex
-arguments, a sender is created using the same arguments.</li>
-
-<li>Wherever a callback was passed as an argument to a disconnected
-lazy curried CPS function, a receiver is passed as the argument of
-a sender's <code>connect</code> member function.</li>
-</ul></li>
-
-<li>Appearances of thunks are replaced by appearances of operation states.
-
-<ul class="org-ul">
-<li>Wherever a thunk was invoked, an operation state is <code>start</code>-ed.</li>
-</ul></li>
-
-<li>Appearances of callbacks get replaced by appearances of receivers.
-
-<ul class="org-ul">
-<li>Wherever a callback was invoked, a receiver's <code>set_value</code> is
-invoked.</li>
-</ul></li>
-
-<li>Wherever an argument was captured, a member variable is initialized.</li>
-</ul>
 </div>
-<div id="outline-container-orgc8396b8" class="outline-4">
-<h4 id="orgc8396b8">Simplified <code>just</code></h4>
-<div class="outline-text-4" id="text-orgc8396b8">
+<div id="outline-container-org4a014a2" class="outline-3">
+<h3 id="org4a014a2">Simplified <code>just</code></h3>
+<div class="outline-text-3" id="text-org4a014a2">
 <p>
-The most basic sender algorithm is <code>just</code>.  This algorithm is what
-<code>std::execution</code> refers to as a <b>sender factory</b>, meaning that it does
-not have any input sender and it produces a sender.  Input senders are
-typically denoted as <i>children senders</i>.  The <i>parent sender</i> in this
-context is the sender returned by the sender algorithm that takes
-senders as input.  The largely common case (but not universal) in
-<code>std::execution</code> is that computation represented by children senders
-is executed before the computation represented by the parent sender.
-In any case, <code>just</code> has no children senders, so by definition nothing
-executes before it.
+The most basic sender algorithm is <code>just</code>.  The API for invoking
+<code>just</code> is about the same as that of Listing <a href="#orga77af81">16</a> &#x2013; main
+difference being the standard decided to use a CPO to disable ADL.
 </p>
 
+
+<p>
+The <code>just</code> algorithm is what <code>std::execution</code> categorizes as a <b>sender
+factory</b>.  A sender factory does not have any input sender and it
+outputs a sender.  So <code>just</code> must return a sender that makes use of
+its data argument somehow, leading us to the following code.
+</p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 21: </span><code>just</code> sender factory</label><pre class="src src-C++" id="org63f372c"><span class="org-keyword">namespace</span> <span class="org-constant">just_</span> {
-  <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
-  <span class="org-keyword">struct</span> <span class="org-type">op</span> {
-    <span class="org-type">Rcv</span> <span class="org-variable-name">next</span>;
-    <span class="org-type">T</span> <span class="org-variable-name">x</span>;
-    <span class="org-type">void</span> <span class="org-function-name">start</span>() { next.set_value(x); }
-  };
+<label class="org-src-name"><span class="listing-number">Listing 23: </span><code>just</code> sender factory (0 of 2)</label><pre class="src src-C++" id="orgc7f427d"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
+<span class="org-keyword">struct</span> <span class="org-constant">just_</span>::<span class="org-type">snd</span>;
 
-  <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
-  <span class="org-keyword">struct</span> <span class="org-type">snd</span> {
-    <span class="org-type">T</span> <span class="org-variable-name">x</span>;
-    <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>&gt;
-    <span class="org-type">op</span>&lt;<span class="org-type">Rcv</span>, <span class="org-type">T</span>&gt; <span class="org-function-name">connect</span>(<span class="org-type">Rcv</span> <span class="org-variable-name">next</span>) { <span class="org-keyword">return</span> {next, x}; }
-  };
-} <span class="org-comment-delimiter">// </span><span class="org-comment">namespace just_
-</span>
 <span class="org-keyword">static</span> <span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> <span class="org-variable-name">just</span> = [](<span class="org-keyword">auto</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> <span class="org-constant">just_</span>::snd(x); };
 </pre>
 </div>
 
 
 <p>
-The code in Listing <a href="#org63f372c">21</a> above is a direct
-application of the recently stated rule of thumb to Listing
-<a href="#org75454ff">16</a>.  Because <code>just_::snd</code> has no children senders, it does
-not make sense for there to be a receiver <code>just_::rcv</code> &#x2013; there are no
-children senders to which it could be connected to.  In more general
-terms, a receiver is associated to a sender when the computation
-represented by the sender requires input data.  This is the case for
-the <code>then</code> algorithm, which we develop next.
+To determine what the <code>just_::snd</code> sender is supposed to do, we can
+procede by analogy with respect to the lazy curried CPS implementation
+of Listing <a href="#orga77af81">16</a>:
+</p>
+
+<ol class="org-ol">
+<li>The constructed sender is analogous to a lazy curried CPS function
+that has been partially applied to its redex arguments.  The
+captured redex arguments become member variables to be initialized
+during sender construction.</li>
+
+<li>The only thing that can be done to a constructed sender is
+<code>connect</code>-ing it to a receiver to produce an operation state
+(applying it to a callback to produce a thunk).</li>
+
+<li>The operation state does something with the receiver and the redex
+arguments, so it is constructed from them.</li>
+</ol>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 24: </span><code>just</code> sender factory (1 of 2)</label><pre class="src src-C++" id="org4ee25d4"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
+<span class="org-keyword">struct</span> <span class="org-constant">just_</span>::<span class="org-type">op</span>;
+
+<span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
+<span class="org-keyword">struct</span> <span class="org-constant">just_</span>::<span class="org-type">snd</span> {
+    <span class="org-type">T</span> <span class="org-variable-name">x</span>;
+    <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>&gt;
+    <span class="org-type">op</span>&lt;<span class="org-type">Rcv</span>, <span class="org-type">T</span>&gt; <span class="org-function-name">connect</span>(<span class="org-type">Rcv</span> <span class="org-variable-name">next</span>) { <span class="org-keyword">return</span> {next, x}; }
+};
+</pre>
+</div>
+
+
+<p>
+Analogously to how invoking a thunk results in the application of the
+callback to the captured data in Listing <a href="#orga77af81">16</a>, <code>start</code>-ing the
+operation state forwards the captured data to the receiver via its
+completion channel: <code>set_value</code>.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 25: </span><code>just</code> sender factory (2 of 2)</label><pre class="src src-C++" id="org87ed409"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
+<span class="org-keyword">struct</span> <span class="org-constant">just_</span>::<span class="org-type">op</span> {
+  <span class="org-type">Rcv</span> <span class="org-variable-name">next</span>;
+  <span class="org-type">T</span> <span class="org-variable-name">x</span>;
+  <span class="org-type">void</span> <span class="org-function-name">start</span>() { next.set_value(x); }
+};
+</pre>
+</div>
+
+
+<p>
+This concludes the implementation of <code>just</code> in the simplified
+<code>std::execution</code> framework.
 </p>
 </div>
 </div>
-<div id="outline-container-org882b5ad" class="outline-4">
-<h4 id="org882b5ad">Simplified <code>then</code></h4>
-<div class="outline-text-4" id="text-org882b5ad">
+<div id="outline-container-org3c9fd48" class="outline-3">
+<h3 id="org3c9fd48">Simplified <code>then</code></h3>
+<div class="outline-text-3" id="text-org3c9fd48">
+<p>
+The <code>then</code> algorithm is what <code>std::execution</code> categorizes as a <b>sender
+adaptor</b>.  The parameter list of sender adaptors consists of both
+senders (one or more) and other parameters required to execute the
+computation represented by the output sender.  The input senders are
+said to be the <b>children senders</b> of the output sender.  Conversely,
+the output sender is the <b>parent sender</b> of the input senders.  A
+sender adaptor thus can be thought as describing the
+children-to-parent relation, i.e. it is a compositional pattern
+between senders.
+</p>
+
+
+<p>
+From the preceding paragraph, we can deduce that <code>then</code> must return a
+sender that makes use of the input sender and input invocable.
+</p>
+
+
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 22: </span><code>then</code> sender adaptor</label><pre class="src src-C++" id="orgb94d88b"><span class="org-keyword">namespace</span> <span class="org-constant">then_</span> {
-  <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Op</span>&gt;
-  <span class="org-keyword">struct</span> <span class="org-type">rcv</span> {
-    <span class="org-type">Op</span>* <span class="org-variable-name">op</span>;
-    <span class="org-type">void</span> <span class="org-function-name">set_value</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> op-&gt;complete(x); }
-  };
+<label class="org-src-name"><span class="listing-number">Listing 26: </span><code>then</code> sender adaptor (0 of N)</label><pre class="src src-C++" id="org768c034"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Prev</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
+<span class="org-keyword">struct</span> <span class="org-constant">then_</span>::<span class="org-type">snd</span>;
 
-  <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">Prev</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
-  <span class="org-keyword">struct</span> <span class="org-type">op</span> {
-    <span class="org-type">Rcv</span> <span class="org-variable-name">next</span>;
-    <span class="org-type">Prev</span> <span class="org-variable-name">prev</span>;
-    <span class="org-type">F</span> <span class="org-variable-name">f</span>;
-
-    <span class="org-type">void</span> <span class="org-function-name">start</span>() {
-      <span class="org-keyword">auto</span> <span class="org-variable-name">op</span> = prev.connect(<span class="org-type">rcv</span>&lt;<span class="org-type">op</span>&gt;{<span class="org-keyword">this</span>});
-      op.start();
-    }
-
-    <span class="org-type">void</span> <span class="org-function-name">complete</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">x</span>) {
-      next.set_value(<span class="org-type">f</span>(<span class="org-variable-name">x</span>));
-    }
-  };
-
-  <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Prev</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
-  <span class="org-keyword">struct</span> <span class="org-type">snd</span> {
-    <span class="org-type">Prev</span> <span class="org-variable-name">prev</span>;
-    <span class="org-type">F</span> <span class="org-variable-name">f</span>;
-    <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>&gt;
-    <span class="org-type">op</span>&lt;<span class="org-type">Rcv</span>, <span class="org-type">Prev</span>, <span class="org-type">F</span>&gt; <span class="org-function-name">connect</span>(<span class="org-type">Rcv</span> <span class="org-variable-name">next</span>) { <span class="org-keyword">return</span> {next, prev, f}; }
-  };
-} <span class="org-comment-delimiter">// </span><span class="org-comment">namespace then_
-</span>
 <span class="org-keyword">static</span> <span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> <span class="org-variable-name">then</span> = [](<span class="org-keyword">auto</span> <span class="org-variable-name">prev</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">f</span>) {
   <span class="org-keyword">return</span> <span class="org-constant">then_</span>::snd(prev, f);
 };
 </pre>
 </div>
+
+<p>
+Similar to the <code>just</code> sender factory, the <code>then</code> sender adaptor
+constructs its associated sender and does nothing else.  This is
+usually the case for sender algorithms in <code>std::execution</code>.
+</p>
+
+
+<p>
+To determine what the <code>then_::snd</code> sender is supposed to do, we can
+procede by analogy with respect to the lazy curried CPS implementation
+of Listing <a href="#org28e98d4">19</a>:
+</p>
+
+<ol class="org-ol">
+<li>The constructed sender is analogous to a lazy curried CPS function
+that has been partially applied to its redex arguments.  The
+captured redex arguments and the child sender become member
+variables to be initialized during sender construction.</li>
+
+<li>The only thing that can be done to a constructed sender is
+<code>connect</code>-ing it to a receiver to produce an operation state
+(applying it to a callback to produce a thunk).</li>
+
+<li>The operation state does something with the receiver, the redex
+arguments, and the child sender, so it is constructed from them.</li>
+</ol>
+
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 27: </span><code>then</code> sender adaptor (1 of N)</label><pre class="src src-C++" id="org99bbfbc"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">Prev</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
+<span class="org-keyword">struct</span> <span class="org-constant">then_</span>::<span class="org-type">op</span>;
+
+<span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Prev</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
+<span class="org-keyword">struct</span> <span class="org-constant">then_</span>::<span class="org-type">snd</span> {
+    <span class="org-type">Prev</span> <span class="org-variable-name">prev</span>;
+    <span class="org-type">F</span> <span class="org-variable-name">f</span>;
+    <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>&gt;
+    <span class="org-type">op</span>&lt;<span class="org-type">Rcv</span>, <span class="org-type">Prev</span>, <span class="org-type">F</span>&gt; <span class="org-function-name">connect</span>(<span class="org-type">Rcv</span> <span class="org-variable-name">next</span>) { <span class="org-keyword">return</span> {next, prev, f}; }
+};
+</pre>
+</div>
+
+<p>
+The <code>then</code> lazy curried CPS of Listing <a href="#org28e98d4">19</a>, once invoked,
+attached a callback to the input invocable parameter and began
+execution of the resulting thunk.
+</p>
+
+<p>
+To do this using in <code>std::execution</code>, we would need a receiver
+associated to the <code>then</code> sender adaptor.  This receiver must be
+<code>connect</code>-ed to the child sender, resulting in an operation state that
+is immedately invoked.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 28: </span><code>then</code> sender adaptor (2 of N)</label><pre class="src src-C++" id="org11e0674"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Op</span>&gt;
+<span class="org-keyword">struct</span> <span class="org-constant">then_</span>::<span class="org-type">rcv</span>;
+
+<span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">Prev</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
+<span class="org-keyword">struct</span> <span class="org-constant">then_</span>::<span class="org-type">op</span> {
+  <span class="org-type">Rcv</span> <span class="org-variable-name">next</span>;
+  <span class="org-type">Prev</span> <span class="org-variable-name">prev</span>;
+  <span class="org-type">F</span> <span class="org-variable-name">f</span>;
+
+  <span class="org-type">void</span> <span class="org-function-name">start</span>() {
+    <span class="org-keyword">auto</span> <span class="org-variable-name">op</span> = prev.connect(<span class="org-type">rcv</span>&lt;op&gt;{<span class="org-keyword">this</span>});
+    op.start();
+  }
+
+  <span class="org-type">void</span> <span class="org-function-name">complete</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">x</span>);
+};
+</pre>
+</div>
+
+<p>
+It is generally the case that a receiver is associated to a sender
+when the computation represented by the sender requires the result of
+at least one of its children senders.
+</p>
 </div>
 </div>
-<div id="outline-container-org1ecc40a" class="outline-4">
-<h4 id="org1ecc40a">Simplified <code>let_value</code></h4>
-<div class="outline-text-4" id="text-org1ecc40a">
+<div id="outline-container-org4fe19eb" class="outline-3">
+<h3 id="org4fe19eb">Simplified <code>let_value</code></h3>
+<div class="outline-text-3" id="text-org4fe19eb">
 <div class="org-src-container">
 <pre class="src src-C++"><span class="org-keyword">namespace</span> <span class="org-constant">let_value_</span> {
   <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Op</span>&gt;
@@ -1123,10 +1273,9 @@ the <code>then</code> algorithm, which we develop next.
 </div>
 </div>
 </div>
-</div>
-<div id="outline-container-orgc632c35" class="outline-3">
-<h3 id="orgc632c35">What about <code>main</code>, again</h3>
-<div class="outline-text-3" id="text-orgc632c35">
+<div id="outline-container-orgb97f79e" class="outline-3">
+<h3 id="orgb97f79e">What about <code>main</code>? Re-revisited</h3>
+<div class="outline-text-3" id="text-orgb97f79e">
 <div class="org-src-container">
 <pre class="src src-C++"><span class="org-keyword">namespace</span> <span class="org-constant">sync_wait_</span> {
   <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Ret</span>&gt;
@@ -1141,7 +1290,7 @@ the <code>then</code> algorithm, which we develop next.
   <span class="org-constant">std</span>::<span class="org-type">optional</span>&lt;<span class="org-type">Ret</span>&gt; <span class="org-variable-name">value</span>;
   <span class="org-keyword">auto</span> <span class="org-variable-name">op</span> = prev.connect(<span class="org-constant">sync_wait_</span>::<span class="org-type">rcv</span>&lt;<span class="org-type">Ret</span>&gt;{&amp;ret});
   op.start();
-  assert(vaule.has_value() <span class="org-keyword">and</span> <span class="org-string">"Completion did not populate return value"</span>);
+  assert(value.has_value() <span class="org-keyword">and</span> <span class="org-string">"Completion did not populate return value"</span>);
   <span class="org-keyword">return</span> *value;
 };
 </pre>
@@ -1159,8 +1308,8 @@ the <code>then</code> algorithm, which we develop next.
 </div>
 </div>
 </div>
-<div id="outline-container-org2393576" class="outline-2">
-<h2 id="org2393576">Conclusions</h2>
+<div id="outline-container-orgb6688b0" class="outline-2">
+<h2 id="orgb6688b0">Conclusions</h2>
 </div>
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
