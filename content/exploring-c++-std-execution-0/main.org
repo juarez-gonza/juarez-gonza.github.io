@@ -293,7 +293,8 @@ while the redex is executed.  Once completion of the redex is signaled
 (somehow) and the result is gathered (somehow), the stored callback
 can be retrived and applied to the result of the redex.
 
-** What about =main=
+** What about =main=?
+<<subsec:what-about-main>>
 
 In the ideal CPS world, everything in a program that is written in CPS
 takes these callback arguments (there can be more than one callback,
@@ -315,6 +316,7 @@ void main() {
 
 Breaking the ideal CPS world feels a bit dirty.  This is C++, we
 should be used to this feeling.
+
 
 * From CPS to =std::execution=
 
@@ -674,6 +676,7 @@ The code is straightforward, the function =just= is in lazy curried
 CPS and it simply captures a value and forwards it to the
 user-provided callback.
 
+
 *** Sequencing
 
 A basic compositional pattern between computations is using the
@@ -731,26 +734,46 @@ auto sq(double x) {
 auto mul_(auto xy) { return std::apply(std::multiplies{}, xy); }  
 #+END_SRC
 
-Now the callback argument and the two lambdas corresponding to the
-currying of the callback parameter and the thunk are implicit. But
-this can be further improved. The usage pattern of =mul_= is common to
-=sq=, =add=, =sqr= and it is captured by the =then= algorithm.  This
-algorithm can be seen as a sort of lifting, like =just=, but for
-mapping functions (functions suitable for =std::transform=).
+In the resulting code, the mechanism by which lazy curried CPS works
+is made implicit, giving more exposure to the computations themselves
+and the way in which they compose.  Just like using STL algorithms
+makes the intent of code clearer than the equivalent code using raw
+loops, we argue that code that uses compositional patterns makes the
+intent of code clearer than the equivalent using raw CPS.  This claim
+might make more sense once we show the full =hypotenuse= example
+refactored, after developing the =then= algorithm in the next section.
+
+
+*** Mapping
+
+The compositional pattern between =sq= and =mul_= in the [[listing:example-refactor-with-let-value-and-just][previous
+section]] is common to =sq=, =add=, and =sqr=.  It is captured by the
+=then= algorithm.  This algorithm can be seen as a lifting from direct
+style to CPS, like =just=, but for mapping functions (functions
+suitable for =std::transform=).  Its only purpose is to apply a
+mapping function to the output of a previous computation before
+forwarding the mapped value as input of the next computation.
 
 #+NAME: listing:then
 #+CAPTION: Mapping with =then=
 #+BEGIN_SRC C++
-auto then(auto f_disconnected, auto map) {
-  return let_value(f_disconnected, [=](auto f_ret) {
+  auto then(auto f_disconnected, auto map) {
     return [=](auto cc) {
       return [=]() {
-        return cc(map(f_ret));
+        return f_disconnected([](auto x) {
+  	return cc(map(x));
+        })();
       };
     };
-  });
-}
+  }
 #+END_SRC
+
+The =then= algorithm can be implemented in terms of =let_value=.
+Meaning it should not be an element of a minimal computational basis
+if =let_value= is already a member of such basis.  Regardless, it
+often makes sense to implement =then= independently of =let_value=
+for efficiency reasons.
+
 
 The running example, after applying these compositional patterns, is
 shown in Listing [[listing:cps-compositional-patterns-hypotenuse]].
@@ -775,7 +798,48 @@ auto hypotenuse(double x, double y) {
 }
 #+END_SRC
 
-** Simplified =std::execution=
+
+*** What about main? Revisited
+
+We have already discussed about =main= being a bridge between direct
+style and CPS.  The compositional pattern that achieves this
+"bridging" is =sync_wait=.  Its implementation simply triggers the
+thunk of the previous computation after attaching a callback that
+"leaks" the result of the previous computation into the direct style
+world (see Listing [[listing:sync-wait]]).
+
+
+#+NAME: listing:sync-wait
+#+CAPTION: Back to direct style with =sync_wait=
+#+BEGIN_SRC C++
+  template<typename Ret>
+  Ret sync_wait(auto f_disconnected) {
+    std::optional<Ret> value;
+    auto thunk = f_disconnected([&](Ret x) { value.emplace(x); });
+    thunk();
+    assert(value.has_value() and "Completion did not populate return value");
+    return *value;
+  }
+#+END_SRC
+
+
+Its usage is indistinguishable from a regular direct style function
+call, with the particularity that the type of the result of the
+computation must be known ahead of time because at this point there is
+no way for it to deduce it automatically.
+
+
+#+NAME: listing:main-with-sync-wait
+#+CAPTION: =main= with =sync_wait=
+#+BEGIN_SRC C++
+  void main() {
+    auto result = sync_wait<double>(hypotenuse(2.0, 3.0));
+    std::println("{}", result);
+  }
+#+END_SRC
+
+
+* Simplified =std::execution=
 
 Compositional patterns over lazy curried CPS, as developed over the
 last sections, are analogous in many ways to the control flow
@@ -795,121 +859,208 @@ mechanism proposed by =std::execution=:
     return lazy curried CPS functions / senders.
   - They describe the way in which computations are composed.
 
-We now translate the lazy curried CPS compositional patterns into a
-structure more alike that of =std::execution='s sender algorithms.
-As a rule of thumb:
+We now procede to translate the developed compositional patterns into
+a structure more alike that of =std::execution='s sender algorithms,
+while we explain some of =std::execution= core terminology.
 
-- Appearances of lazy curried CPS functions are replaced by
-  appearances of senders.
+** Simplified =just=
 
-  - Wherever a lazy curried CPS function was applied to redex
-    arguments, a sender is created using the same arguments.
-
-  - Wherever a callback was passed as an argument to a disconnected
-    lazy curried CPS function, a receiver is passed as the argument of
-    a sender's =connect= member function.
-
-- Appearances of thunks are replaced by appearances of operation states.
-
-  - Wherever a thunk was invoked, an operation state is =start=-ed.
-
-- Appearances of callbacks get replaced by appearances of receivers.
-
-  - Wherever a callback was invoked, a receiver's =set_value= is
-    invoked.
-
-- Wherever an argument was captured, a member variable is initialized.
-
-*** Simplified =just=
-
-The most basic sender algorithm is =just=.  This algorithm is what
-=std::execution= refers to as a *sender factory*, meaning that it does
-not have any input sender and it produces a sender.  Input senders are
-typically denoted as /children senders/.  The /parent sender/ in this
-context is the sender returned by the sender algorithm that takes
-senders as input.  The largely common case (but not universal) in
-=std::execution= is that computation represented by children senders
-is executed before the computation represented by the parent sender.
-In any case, =just= has no children senders, so by definition nothing
-executes before it.
+The most basic sender algorithm is =just=.  The API for invoking
+=just= is about the same as that of Listing [[listing:just]] -- main
+difference being the standard decided to use a CPO to disable ADL.
 
 
-#+NAME: listing:just-sender-factory
-#+CAPTION: =just= sender factory
+The =just= algorithm is what =std::execution= categorizes as a *sender
+factory*.  A sender factory does not have any input sender and it
+outputs a sender.  So =just= must return a sender that makes use of
+its data argument somehow, leading us to the following code.
+
+#+NAME: listing:just-sender-factory-step-0
+#+CAPTION: =just= sender factory (0 of 2)
 #+BEGIN_SRC C++
-  namespace just_ {
-    template<typename Rcv, typename T>
-    struct op {
-      Rcv next;
-      T x;
-      void start() { next.set_value(x); }
-    };
-
-    template<typename T>
-    struct snd {
-      T x;
-      template<typename Rcv>
-      op<Rcv, T> connect(Rcv next) { return {next, x}; }
-    };
-  } // namespace just_
+  template<typename T>
+  struct just_::snd;
 
   static constexpr auto just = [](auto x) { return just_::snd(x); };
 #+END_SRC
 
 
-The code in Listing [[listing:just-sender-factory]] above is a direct
-application of the recently stated rule of thumb to Listing
-[[listing:just]].  Because =just_::snd= has no children senders, it does
-not make sense for there to be a receiver =just_::rcv= -- there are no
-children senders to which it could be connected to.  In more general
-terms, a receiver is associated to a sender when the computation
-represented by the sender requires input data.  This is the case for
-the =then= algorithm, which we develop next.
+To determine what the =just_::snd= sender is supposed to do, we can
+procede by analogy with respect to the lazy curried CPS implementation
+of Listing [[listing:just]]:
 
-*** Simplified =then=
+1. The constructed sender is analogous to a lazy curried CPS function
+   that has been partially applied to its redex arguments.  The
+   captured redex arguments become member variables to be initialized
+   during sender construction.
 
+2. The only thing that can be done to a constructed sender is
+   =connect=-ing it to a receiver to produce an operation state
+   (applying it to a callback to produce a thunk).
 
-#+NAME: listing:then-sender-adaptor
-#+CAPTION: =then= sender adaptor
+3. The operation state does something with the receiver and the redex
+   arguments, so it is constructed from them.
+
+#+NAME: listing:just-sender-factory-step-1
+#+CAPTION: =just= sender factory (1 of 2)
 #+BEGIN_SRC C++
-  namespace then_ {
-    template<typename Op>
-    struct rcv {
-      Op* op;
-      void set_value(auto x) { return op->complete(x); }
-    };
+  template<typename Rcv, typename T>
+  struct just_::op;
 
-    template<typename Rcv, typename Prev, typename F>
-    struct op {
-      Rcv next;
-      Prev prev;
-      F f;
-
-      void start() {
-        auto op = prev.connect(rcv<op>{this});
-        op.start();
-      }
-
-      void complete(auto x) {
-        next.set_value(f(x));
-      }
-    };
-
-    template<typename Prev, typename F>
-    struct snd {
-      Prev prev;
-      F f;
+  template<typename T>
+  struct just_::snd {
+      T x;
       template<typename Rcv>
-      op<Rcv, Prev, F> connect(Rcv next) { return {next, prev, f}; }
-    };
-  } // namespace then_
+      op<Rcv, T> connect(Rcv next) { return {next, x}; }
+  };
+#+END_SRC
+
+
+Analogously to how invoking a thunk results in the application of the
+callback to the captured data in Listing [[listing:just]], =start=-ing the
+operation state forwards the captured data to the receiver via its
+completion channel: =set_value=.
+
+#+NAME: listing:just-sender-factory-step-2
+#+CAPTION: =just= sender factory (2 of 2)
+#+BEGIN_SRC C++
+  template<typename Rcv, typename T>
+  struct just_::op {
+    Rcv next;
+    T x;
+    void start() { next.set_value(x); }
+  };
+#+END_SRC
+
+
+This concludes the implementation of =just= in the simplified
+=std::execution= framework.
+
+# Input senders
+# of a sender algorithm are typically referred to as *children senders*
+# of the output or *parent sender*.  The largely common case (but not
+# universal) in =std::execution= is that computation represented by
+# children senders is executed before the computation represented by
+# their parent sender.  The sender algorithm that relates them describes
+# the children-to-parent dependency (compositional pattern).  =just= has
+# no children senders, so it does not depend on the output of any
+# children.
+
+# The code in Listing [[listing:just-sender-factory]] above is a direct
+# application of the recently stated rule of thumb to Listing
+# [[listing:just]].  Because =just_::snd= has no children senders, it does
+# not make sense for there to be a receiver =just_::rcv= -- there are no
+# children senders to which it could be connected to.
+
+** Simplified =then=
+
+The =then= algorithm is what =std::execution= categorizes as a *sender
+adaptor*.  The parameter list of sender adaptors consists of both
+senders (one or more) and other parameters required to execute the
+computation represented by the output sender.  The input senders are
+said to be the *children senders* of the output sender.  Conversely,
+the output sender is the *parent sender* of the input senders.  A
+sender adaptor thus can be thought as describing the
+children-to-parent relation, i.e. it is a compositional pattern
+between senders.
+
+
+From the preceding paragraph, we can deduce that =then= must return a
+sender that makes use of the input sender and input invocable.
+
+
+#+NAME: listing:then-sender-adaptor-step-0
+#+CAPTION: =then= sender adaptor (0 of N)
+#+BEGIN_SRC C++
+  template<typename Prev, typename F>
+  struct then_::snd;
 
   static constexpr auto then = [](auto prev, auto f) {
     return then_::snd(prev, f);
   };
 #+END_SRC
 
-*** Simplified =let_value=
+Similar to the =just= sender factory, the =then= sender adaptor
+constructs its associated sender and does nothing else.  This is
+usually the case for sender algorithms in =std::execution=.
+
+
+To determine what the =then_::snd= sender is supposed to do, we can
+procede by analogy with respect to the lazy curried CPS implementation
+of Listing [[listing:then]]:
+
+1. The constructed sender is analogous to a lazy curried CPS function
+   that has been partially applied to its redex arguments.  The
+   captured redex arguments and the child sender become member
+   variables to be initialized during sender construction.
+
+2. The only thing that can be done to a constructed sender is
+   =connect=-ing it to a receiver to produce an operation state
+   (applying it to a callback to produce a thunk).
+
+3. The operation state does something with the receiver, the redex
+   arguments, and the child sender, so it is constructed from them.
+
+
+#+NAME: listing:then-sender-adaptor-step-1
+#+CAPTION: =then= sender adaptor (1 of N)
+#+BEGIN_SRC C++
+  template<typename Rcv, typename Prev, typename F>
+  struct then_::op;
+
+  template<typename Prev, typename F>
+  struct then_::snd {
+      Prev prev;
+      F f;
+      template<typename Rcv>
+      op<Rcv, Prev, F> connect(Rcv next) { return {next, prev, f}; }
+  };
+#+END_SRC
+
+The =then= lazy curried CPS of Listing [[listing:then]], once invoked,
+attached a callback to the input invocable parameter and began
+execution of the resulting thunk.
+
+To do this using in =std::execution=, we would need a receiver
+associated to the =then= sender adaptor.  This receiver must be
+=connect=-ed to the child sender, resulting in an operation state that
+is immedately invoked.
+
+#+NAME: listing:then-sender-adaptor-step-2
+#+CAPTION: =then= sender adaptor (2 of N)
+#+BEGIN_SRC C++
+  template<typename Op>
+  struct then_::rcv;
+
+  template<typename Rcv, typename Prev, typename F>
+  struct then_::op {
+    Rcv next;
+    Prev prev;
+    F f;
+
+    void start() {
+      auto op = prev.connect(rcv<op>{this});
+      op.start();
+    }
+
+    void complete(auto x);
+  };
+#+END_SRC
+
+It is generally the case that a receiver is associated to a sender
+when the computation represented by the sender requires the result of
+at least one of its children senders.
+
+
+# It seems to be a common convention in =std::execution= that the
+# associated receiver simply forwards the result to a member function of
+# the operation state.  There is some rationale behind it, but for now
+# knowing that this is a common pattern is enough.
+
+# =then_::rcv= must
+# forward the
+
+** Simplified =let_value=
 
 
 #+BEGIN_SRC C++
@@ -953,7 +1104,7 @@ the =then= algorithm, which we develop next.
 #+END_SRC
 
 
-** What about =main=, again
+** What about =main=? Re-revisited
 
 #+BEGIN_SRC C++
   namespace sync_wait_ {
@@ -969,7 +1120,7 @@ the =then= algorithm, which we develop next.
     std::optional<Ret> value;
     auto op = prev.connect(sync_wait_::rcv<Ret>{&ret});
     op.start();
-    assert(vaule.has_value() and "Completion did not populate return value");
+    assert(value.has_value() and "Completion did not populate return value");
     return *value;
   };
 #+END_SRC
