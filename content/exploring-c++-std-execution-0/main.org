@@ -194,9 +194,10 @@ program transformation throughout the whole program:
 
 1. Start from the beginning of the program
 2. Recognize the redex and its continuation.
-3. <<cps-transform:step-3>>Replace the redex by a /CPS function/ (see Listing
-   [[listing:cps-transform-step-3]]). This function:
-   1. Takes the parameters needed to execute the redex.
+3. <<cps-transform:step-3>>Replace the redex by a *CPS function* (see
+   Listing [[listing:cps-transform-step-3]]). This function:
+   1. Takes the parameters needed to execute the redex, referred to as
+      *redex data*.
    2. Takes one extra invocable parameter per continuation.  These are
       referred to as *callbacks*.
    3. Returns the result of applying only one of the callbacks to the
@@ -329,18 +330,19 @@ to the framework.
 ** Currying the callback arguments
 <<subsec:currying>>
 
-The CPS function, created at [[cps-transform:step-3][step 3]] of the CPS transform, holds two
+The CPS function created at [[cps-transform:step-3][step 3]] of the CPS transform holds two
 kinds of parameters:
 
 
-1. The data that allows the execution of the redex.
-2. The callbacks representing the continuations of the redex.
+1. The data that allows the execution of the redex.  We refer to these
+   as *redex data*.
+2. The callbacks representing the continuations of the redex.  We
+   refer to these as *callback parameters*.
 
 
-The purpose of the next transformation is to refactor CPS functions in
-order gain a clear separation between these two kinds of arguments.
-[[Https://en.wikipedia.org/wiki/Currying][Currying]] the callback arguments achieves this goal (see Listing
-[[listing:curry-cps-callee]] and [[listing:curry-cps-caller]]).
+We want to gain a clear separation between these two kinds of
+arguments.  [[Https://en.wikipedia.org/wiki/Currying][Currying]] the callback arguments achieves this goal (see
+Listing [[listing:curry-cps-callee]] and [[listing:curry-cps-caller]]).
 
 
 #+NAME: listing:curry-cps-callee
@@ -407,8 +409,7 @@ continuations.
 Invoking a function written in /curried CPS/[fn:curried-cps] is two
 stepped:
 
-1. The curried CPS function is partially applied to the redex
-   arguments.
+1. The curried CPS function is partially applied to the redex data.
 2. The partially applied curried CPS function is applied to the
    callbacks and execution of the redex begins.
 
@@ -422,9 +423,9 @@ of finite state machines (FSM):
   in a *non-configured* state.
 
 - When the curried CPS function is partially applied to the redex
-  arguments, the FSM transitions to a *disconnected* state.  At this
-  point the redex does not begin execution, but all the information
-  needed to do so is available.
+  data, the FSM transitions to a *disconnected* state.  At this point
+  the redex does not begin execution, but all the information needed
+  to do so is available.
 
 - Finally, when the partially applied CPS function is appiled to the
   remaining callback arguments, the FSM transitions to the *started*
@@ -441,7 +442,7 @@ of finite state machines (FSM):
   digraph G {
     initial [shape=point, width=0.15, label=""];
     initial -> "Non-configured";
-    "Non-configured" -> Disconnected [label=" redex args"];
+    "Non-configured" -> Disconnected [label=" redex data"];
     Disconnected -> Started [label=" callbacks"];
   }
 #+END_SRC
@@ -506,7 +507,7 @@ applied to curried CPS functions is depicted in the listings below.
 
 Just like the curried callback parameter in the [[listing:curry-cps-callee][previous section]], the
 thunk must capture by value.  This is to prevent dangling of both
-redex and callback arguments.  Call-site rules change, however.
+redex data and callback arguments.  Call-site rules change, however.
 Before thunks callbacks created at call-site could capture by
 reference safely.  Now only the caller that invokes the thunk can do
 so.  The problematic case is depicted in Listing
@@ -558,7 +559,7 @@ Invoking a function written in /lazy curried CPS/[fn:lazy-curried-cps] is
 three stepped:
 
 1. The lazy curried CPS function is partially applied to the redex
-   arguments.
+   data.
 2. The partially applied lazy curried CPS function is applied to the callbacks
    and returns a thunk.
 3. The returned thunk is invoked and execution of the redex begins.
@@ -596,7 +597,7 @@ terms of finite state machines (FSM):
    digraph G {
      initial [shape=point, width=0.15, label=""];
      initial -> "Non-configured";
-     "Non-configured" -> Disconnected [label=" redex args"];
+     "Non-configured" -> Disconnected [label=" redex data"];
      Disconnected -> Connected [label=" callbacks"];
      Connected -> Started [label=" thunk invocation"];
    }
@@ -612,9 +613,9 @@ would be very naive to expect code like that of Listing
 [[listing:lazy-curried-cps-hypotenuse]] to be maintainable or even
 pleasant to read.
 
-** Compositional patterns
+** Computational basis & compositional patterns
 
-In Elements of Programming, a *computational basis* for a type is
+In Elements of Programming, a *computational basis for a type* is
 defined as the finite set of procedures that enable the construction
 of any other procedure on the type.  In other words, these procedures
 can be [[https://en.wikipedia.org/wiki/Function_composition_(computer_science)][functionally composed]] to obtain any other procedure on the
@@ -624,7 +625,7 @@ efficiency aspect for now).
 
 
 We can reformulate the notion of computational basis for types to
-obtain the notion of computational basis for computation itself.  The
+obtain the notion of *computational basis for computation* itself.  The
 procedures on computations are simply the compositional patterns that
 enable constructing larger computations from smaller ones.  A
 computational basis for computation is a finite set of compositional
@@ -706,10 +707,10 @@ The names chosen for the parameters and variables of Listing
 understand the application of lazy curried CPS in the [[sec:laziness-and-thunks][previous
 section]].  Both parameters are functions written in lazy curried CPS,
 but =f_disconnected= has been already partially applied to its redex
-arguments by the time =let_value= is applied to it, while
+data by the time =let_value= is applied to it, while
 =g_nonconfig= has no arguments available to it.  When started,
 =let_value= executes the computation enclosed by =f_disconnected= and
-forwards its result as the redex arguments of =g_nonconfig=, obtaining
+forwards its result as the redex data of =g_nonconfig=, obtaining
 =g_disconnected=.  The callback argument of =let_value= is then
 attached to =g_disconnected=, and the resulting thunk is immediately
 invoked.
@@ -741,7 +742,7 @@ makes the intent of code clearer than the equivalent code using raw
 loops, we argue that code that uses compositional patterns makes the
 intent of code clearer than the equivalent using raw CPS.  This claim
 might make more sense once we show the full =hypotenuse= example
-refactored, after developing the =then= algorithm in the next section.
+refactored, after developing the =then= algorithm.
 
 
 *** Mapping
@@ -750,9 +751,9 @@ The compositional pattern between =sq= and =mul_= in the [[listing:example-refac
 section]] is common to =sq=, =add=, and =sqr=.  It is captured by the
 =then= algorithm.  This algorithm can be seen as a lifting from direct
 style to CPS, like =just=, but for mapping functions (functions
-suitable for =std::transform=).  Its only purpose is to apply a
-mapping function to the output of a previous computation before
-forwarding the mapped value as input of the next computation.
+suitable for =std::transform=) instead of data.  Its only purpose is
+to apply a mapping function to the output of a previous computation
+before forwarding the mapped value as input of the next computation.
 
 #+NAME: listing:then
 #+CAPTION: Mapping with =then=
@@ -767,13 +768,6 @@ forwarding the mapped value as input of the next computation.
     };
   }
 #+END_SRC
-
-The =then= algorithm can be implemented in terms of =let_value=.
-Meaning it should not be an element of a minimal computational basis
-if =let_value= is already a member of such basis.  Regardless, it
-often makes sense to implement =then= independently of =let_value=
-for efficiency reasons.
-
 
 The running example, after applying these compositional patterns, is
 shown in Listing [[listing:cps-compositional-patterns-hypotenuse]].
@@ -801,12 +795,12 @@ auto hypotenuse(double x, double y) {
 
 *** What about main? Revisited
 
-We have already discussed about =main= being a bridge between direct
-style and CPS.  The compositional pattern that achieves this
-"bridging" is =sync_wait=.  Its implementation simply triggers the
-thunk of the previous computation after attaching a callback that
-"leaks" the result of the previous computation into the direct style
-world (see Listing [[listing:sync-wait]]).
+We have [[subsec:what-about-main][already discussed]] =main= being a bridge between direct style
+and CPS.  The compositional pattern that achieves this "bridging" is
+=sync_wait=.  Its implementation simply triggers the thunk of the
+previous computation after attaching a callback that "leaks" the
+result of the previous computation into the direct style world (see
+Listing [[listing:sync-wait]]).
 
 
 #+NAME: listing:sync-wait
@@ -838,6 +832,37 @@ no way for it to deduce it automatically.
   }
 #+END_SRC
 
+*** Computational basis for computation
+
+The compositional patterns developed so far: =just=, =let_value=,
+=then=, and =sync_wait= are almost enough to express all the ways in
+which computations can be composed together.  That is, they are enough
+to conform a computational basis for computation, with some caveats:
+
+- No recursivity / iteration: =let_value= is missing some type erasure
+  that would allow us to implement recursive / iterative patterns.
+  This is intentionally left out of our implementation, for the
+  pedagogical sake of simplicity.
+
+- It is not a /minimal/ computational basis: The =then= algorithm can
+  be implemented in terms of =let_value=.  Regardless, it often makes
+  sense to implement =then= independently of =let_value= for
+  efficiency reasons.
+
+- It is not an /efficient/ computational basis: These algorithms,
+  while sufficient to express dependencies between computations, they
+  are hardly an efficient way to do so in every possible use
+  case. E.g. if a computation depended on the result of several
+  computations, with these computational basis we only have the option
+  to execute them one-by-one, accumulating and forwarding the results
+  via subsequent invocations to =let_value=.
+
+
+With respect to this last point, we could view the sender algorithms
+of =std::execution= as an attempt to provide an efficient
+computational basis.  In the search for efficiency, minimality is
+lost.
+
 
 * Simplified =std::execution=
 
@@ -849,7 +874,7 @@ mechanism proposed by =std::execution=:
   - Invoking =operator()= / =set_value= on them propagates results
     through the execution.
 - Thunks are analogous to operation state.
-  - They ensure redex arguments' lifetime until completion.
+  - They ensure redex data's lifetime until completion.
   - Once called / =start=-ed the redex is executed.
 - Lazy curried CPS functions are analogous to senders.
   - They enclose computation, but do not execute it (lazy).
@@ -890,8 +915,8 @@ procede by analogy with respect to the lazy curried CPS implementation
 of Listing [[listing:just]]:
 
 1. The constructed sender is analogous to a lazy curried CPS function
-   that has been partially applied to its redex arguments.  The
-   captured redex arguments become member variables to be initialized
+   that has been partially applied to its redex data.  The
+   captured redex data become member variables to be initialized
    during sender construction.
 
 2. The only thing that can be done to a constructed sender is
@@ -899,7 +924,7 @@ of Listing [[listing:just]]:
    (applying it to a callback to produce a thunk).
 
 3. The operation state does something with the receiver and the redex
-   arguments, so it is constructed from them.
+   data, so it is constructed from them.
 
 #+NAME: listing:just-sender-factory-step-1
 #+CAPTION: =just= sender factory (1 of 2)
@@ -970,7 +995,7 @@ sender that makes use of the input sender and input invocable.
 
 
 #+NAME: listing:then-sender-adaptor-step-0
-#+CAPTION: =then= sender adaptor (0 of N)
+#+CAPTION: =then= sender adaptor (0 of 3)
 #+BEGIN_SRC C++
   template<typename Prev, typename F>
   struct then_::snd;
@@ -990,8 +1015,8 @@ procede by analogy with respect to the lazy curried CPS implementation
 of Listing [[listing:then]]:
 
 1. The constructed sender is analogous to a lazy curried CPS function
-   that has been partially applied to its redex arguments.  The
-   captured redex arguments and the child sender become member
+   that has been partially applied to its redex data.  The
+   captured redex data and the child sender become member
    variables to be initialized during sender construction.
 
 2. The only thing that can be done to a constructed sender is
@@ -999,11 +1024,11 @@ of Listing [[listing:then]]:
    (applying it to a callback to produce a thunk).
 
 3. The operation state does something with the receiver, the redex
-   arguments, and the child sender, so it is constructed from them.
+   data, and the child sender, so it is constructed from them.
 
 
 #+NAME: listing:then-sender-adaptor-step-1
-#+CAPTION: =then= sender adaptor (1 of N)
+#+CAPTION: =then= sender adaptor (1 of 3)
 #+BEGIN_SRC C++
   template<typename Rcv, typename Prev, typename F>
   struct then_::op;
@@ -1019,15 +1044,14 @@ of Listing [[listing:then]]:
 
 The =then= lazy curried CPS of Listing [[listing:then]], once invoked,
 attached a callback to the input invocable parameter and began
-execution of the resulting thunk.
-
-In the context of =std::execution=, the =then= adaptor would need an
-associated receiver.  This receiver must be =connect=-ed to the child
-sender of =then_::snd= when =then_::op::start= is invoked, resulting
-in an operation state that is immedately invoked.
+execution of the resulting thunk.  In the context of =std::execution=,
+the =then= adaptor would need an associated receiver.  This receiver
+must be =connect=-ed to the child sender of =then_::snd= when
+=then_::op::start= is invoked, resulting in an operation state that is
+immedately invoked.
 
 #+NAME: listing:then-sender-adaptor-step-2
-#+CAPTION: =then= sender adaptor (2 of N)
+#+CAPTION: =then= sender adaptor (2 of 3)
 #+BEGIN_SRC C++
   template<typename Op>
   struct then_::rcv;
@@ -1048,17 +1072,33 @@ in an operation state that is immedately invoked.
 #+END_SRC
 
 It is generally the case that a receiver is associated to a sender
-when the computation represented by the sender requires the result of
-at least one of its children senders.
+when the computation represented by the sender depends on the result
+of at least one of its children senders.
 
 
-# It seems to be a common convention in =std::execution= that the
-# associated receiver simply forwards the result to a member function of
-# the operation state.  There is some rationale behind it, but for now
-# knowing that this is a common pattern is enough.
+The code in Listing [[listing:then-sender-adaptor-step-2]] declares
+=then_::op::complete= function template and constructs =then_::rcv=.
+A common pattern in =std::execution= is for the receiver completion
+channel's body to be a simple forwarding expression.  Anything more
+complex is communicated back into its associated operation state via
+member functions in the operation state (=then_::op::complete=).  This
+is depicted in Listing [[listing:then-sender-adaptor-step-3]].
 
-# =then_::rcv= must
-# forward the
+
+#+NAME: listing:then-sender-adaptor-step-3
+#+CAPTION: =then= sender adaptor (3 of 3)
+#+BEGIN_SRC C++
+  template<typename Op>
+  struct then_::rcv {
+    Op* op;
+    void set_value(auto x) { return op->complete(x); }
+  };
+
+  template<typename Rcv, typename Prev, typename F>
+  void then_::op::complete(auto x) {
+    next.set_value(f(x));
+  };
+#+END_SRC
 
 ** Simplified =let_value=
 
