@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>&lrm;</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="https://gongzhitaao.org/orgcss/org.css" />
+</head>
+<body>
+<div id="preamble" class="status">
+<div class='topnav'>
+                                     <a href='/index.html'>Home</a>
+                                     </div>
+</div>
+<div id="content" class="content">
+<div id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orgaa8305c">Computational basis &amp; compositional patterns</a>
+<ul>
+<li>
+<ul>
+<li><a href="#org095bd06">Lifting</a></li>
+<li><a href="#org5748f23">Sequencing</a></li>
+<li><a href="#org3ae1230">Mapping</a></li>
+<li><a href="#org07d7b82">What about main? Revisited</a></li>
+<li><a href="#org595212c">Computational basis for computation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgaa8305c" class="outline-2">
+<h2 id="orgaa8305c">Computational basis &amp; compositional patterns</h2>
+<div class="outline-text-2" id="text-orgaa8305c">
+<p>
+In Elements of Programming, a <b>computational basis for a type</b> is
+defined as the finite set of procedures that enable the construction
+of any other procedure on the type.  In other words, these procedures
+can be <a href="https://en.wikipedia.org/wiki/Function_composition_(computer_science)">functionally composed</a> to obtain any other procedure on the
+type.  For example, for unsigned integers a computational basis could
+be <code>zero</code>, <code>operator==</code>, and <code>successor</code> functions (let us ignore the
+efficiency aspect for now).
+</p>
+
+
+<p>
+We can reformulate the notion of computational basis for types to
+obtain the notion of <b>computational basis for computation</b> itself.  The
+procedures on computations are simply the compositional patterns that
+enable constructing larger computations from smaller ones.  A
+computational basis for computation is a finite set of compositional
+patterns from which every other compositional pattern can be
+obtained <sup><a id="fnr.computational-basis-for-computation" class="footref" href="#fn.computational-basis-for-computation" role="doc-backlink">1</a></sup>.
+</p>
+
+
+<p>
+Since the redex and continuations we have been abstracting over are a
+way to represent computations, these facts about compositional
+patterns and computational basis apply to the framework we have
+developed throughout the last few sections.  We can readily identify a
+basis in Listing (tbd-link)lazy curried cps hypotenuse: lifting and
+sequencing.  We will use these patterns to remove noise from the
+running example, making it more maintainable and aesthetically
+pleasing.
+</p>
+</div>
+<div id="outline-container-org095bd06" class="outline-4">
+<h4 id="org095bd06">Lifting</h4>
+<div class="outline-text-4" id="text-org095bd06">
+<p>
+Lifting in the context of CPS occurs whenever we want to carry some
+data from the direct style world to the CPS world. In Listing
+(tbd-link)lazy cps curried hypotenuse this occurs to the arguments of
+<code>hypotenuse</code>, which are lifted in <code>sq</code>, <code>add</code>, <code>sqr</code> before their
+usage in the redex expressions.  The general pattern is implemented in
+the listing below.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 1: </span>Lifting with <code>just</code></label><pre class="src src-C++" id="orgc349716"><span class="org-keyword">auto</span> <span class="org-function-name">just</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">value</span>) {
+  <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
+    <span class="org-keyword">return</span> [=]() {
+      <span class="org-keyword">return</span> cc(value);
+    };
+  };
+}
+</pre>
+</div>
+
+
+<p>
+The code is straightforward, the function <code>just</code> is in lazy curried
+CPS and it simply captures a value and forwards it to the
+user-provided callback.
+</p>
+</div>
+</div>
+<div id="outline-container-org5748f23" class="outline-4">
+<h4 id="org5748f23">Sequencing</h4>
+<div class="outline-text-4" id="text-org5748f23">
+<p>
+A basic compositional pattern between computations is using the
+outputs of one computation as the inputs of the next computation.  The
+function in Listing (tbd-link)let value, <code>let_value</code>, captures this pattern.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 2: </span>Sequencing with <code>let_value</code></label><pre class="src src-C++" id="org8d7f38b"><span class="org-keyword">auto</span> <span class="org-function-name">let_value</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">g_nonconfig</span>) {
+  <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
+    <span class="org-keyword">return</span> [=]() {
+      <span class="org-keyword">auto</span> <span class="org-variable-name">f_connected</span> = f_disconnected([=](<span class="org-keyword">auto</span> <span class="org-variable-name">f_ret</span>) {
+        <span class="org-keyword">auto</span> <span class="org-variable-name">g_disconnected</span> = g_nonconfig(f_ret);
+        <span class="org-keyword">auto</span> <span class="org-variable-name">g_connected</span> = g_disconnected(cc);
+        <span class="org-keyword">return</span> g_connected();
+      });
+      <span class="org-keyword">return</span> f_connected();
+    };
+  };
+}
+</pre>
+</div>
+
+
+<p>
+The names chosen for the parameters and variables of Listing
+(tbd-link)let value reference the states of the state machine used to
+understand the application of lazy curried CPS in the (tbd-link
+laziness and thunks)previous section.  Both parameters are functions
+written in lazy curried CPS, but <code>f_disconnected</code> has been already
+partially applied to its redex data by the time <code>let_value</code> is applied
+to it, while <code>g_nonconfig</code> has no arguments available to it.  When
+started, <code>let_value</code> executes the computation enclosed by
+<code>f_disconnected</code> and forwards its result as the redex data of
+<code>g_nonconfig</code>, obtaining <code>g_disconnected</code>.  The callback argument of
+<code>let_value</code> is then attached to <code>g_disconnected</code>, and the resulting
+thunk is immediately invoked.
+</p>
+
+
+<p>
+With <code>let_value</code> and <code>just</code> at hand, we can already improve the
+readability of the running example quite a bit. Listing
+<a href="#org2fd9be9">3</a> shows the refactor of <code>sq</code>.
+</p>
+
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 3: </span>Refactor of <code>sq</code> with <code>let_value</code> and <code>just</code></label><pre class="src src-C++" id="org2fd9be9"><span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS
+</span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(x * x); }; }; }
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS with let_value and just
+</span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) {
+  <span class="org-keyword">return</span> let_value(just(make_pair(x, x)), [](<span class="org-keyword">auto</span> <span class="org-variable-name">xy</span>) { <span class="org-keyword">return</span> just(mul_(xy)); });
+}
+<span class="org-comment-delimiter">// </span><span class="org-comment">where mul_ is:
+</span><span class="org-keyword">auto</span> <span class="org-function-name">mul_</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">xy</span>) { <span class="org-keyword">return</span> <span class="org-constant">std</span>::apply(<span class="org-constant">std</span>::multiplies{}, xy); }  
+</pre>
+</div>
+
+<p>
+In the resulting code, the mechanism by which lazy curried CPS works
+is made implicit, giving more exposure to the computations themselves
+and the way in which they compose.  Just like using STL algorithms
+makes the intent of code clearer than the equivalent code using raw
+loops, we argue that code that uses compositional patterns makes the
+intent of code clearer than the equivalent using raw CPS.  This claim
+might make more sense once we show the full <code>hypotenuse</code> example
+refactored, after developing the <code>then</code> algorithm.
+</p>
+</div>
+</div>
+<div id="outline-container-org3ae1230" class="outline-4">
+<h4 id="org3ae1230">Mapping</h4>
+<div class="outline-text-4" id="text-org3ae1230">
+<p>
+The compositional pattern between <code>sq</code> and <code>mul_</code> in the <a href="#org2fd9be9">previous
+section</a> is common to <code>sq</code>, <code>add</code>, and <code>sqr</code>.  It is captured by the
+<code>then</code> algorithm.  This algorithm can be seen as a lifting from direct
+style to CPS, like <code>just</code>, but for mapping functions (functions
+suitable for <code>std::transform</code>) instead of data.  Its only purpose is
+to apply a mapping function to the output of a previous computation
+before forwarding the mapped value as input of the next computation.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 4: </span>Mapping with <code>then</code></label><pre class="src src-C++" id="org53784d2"><span class="org-keyword">auto</span> <span class="org-function-name">then</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">map</span>) {
+  <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
+    <span class="org-keyword">return</span> [=]() {
+      <span class="org-keyword">return</span> f_disconnected([](<span class="org-keyword">auto</span> <span class="org-variable-name">x</span>) {
+        <span class="org-keyword">return</span> cc(<span class="org-type">map</span>(<span class="org-variable-name">x</span>));
+      })();
+    };
+  };
+}
+</pre>
+</div>
+
+<p>
+The running example, after applying these compositional patterns, is
+shown in Listing <a href="#org1d0c09e">5</a>.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 5: </span>Hypotenuse function written with CPS compositional patterns</label><pre class="src src-C++" id="org1d0c09e"><span class="org-comment-delimiter">// </span><span class="org-comment">mul_, add_, sqrt_ are the usual arithmetic operations.
+</span><span class="org-comment-delimiter">// </span><span class="org-comment">binary operations taking a pair instead of two args
+</span>
+<span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> then(just(make_pair(x, x)), mul_); }
+<span class="org-keyword">auto</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> then(just(make_pair(x, y)), add_); }
+<span class="org-keyword">auto</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> then(just(x), sqrt_); }
+<span class="org-keyword">auto</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+  <span class="org-keyword">return</span> let_value(sq(x), [=](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) {
+    <span class="org-keyword">return</span> let_value(sq(y), [=](<span class="org-type">double</span> <span class="org-variable-name">sqy</span>) {
+      <span class="org-keyword">return</span> let_value(add(sqx, sqy), [=](<span class="org-type">double</span> <span class="org-variable-name">r</span>) {
+        <span class="org-keyword">return</span> sqr(r);
+      });
+    });
+  });
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org07d7b82" class="outline-4">
+<h4 id="org07d7b82">What about main? Revisited</h4>
+<div class="outline-text-4" id="text-org07d7b82">
+<p>
+We have (tbd-link what about main) already discussed <code>main</code> being a bridge between direct style
+and CPS.  The compositional pattern that achieves this "bridging" is
+<code>sync_wait</code>.  Its implementation simply triggers the thunk of the
+previous computation after attaching a callback that "leaks" the
+result of the previous computation into the direct style world (see
+Listing <a href="#org6120296">6</a>).
+</p>
+
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 6: </span>Back to direct style with <code>sync_wait</code></label><pre class="src src-C++" id="org6120296"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Ret</span>&gt;
+<span class="org-type">Ret</span> <span class="org-function-name">sync_wait</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>) {
+  <span class="org-constant">std</span>::<span class="org-type">optional</span>&lt;<span class="org-type">Ret</span>&gt; <span class="org-variable-name">value</span>;
+  <span class="org-keyword">auto</span> <span class="org-variable-name">thunk</span> = f_disconnected([&amp;](<span class="org-type">Ret</span> <span class="org-variable-name">x</span>) { value.emplace(x); });
+  thunk();
+  assert(value.has_value() <span class="org-keyword">and</span> <span class="org-string">"Completion did not populate return value"</span>);
+  <span class="org-keyword">return</span> *value;
+}
+</pre>
+</div>
+
+
+<p>
+Its usage is indistinguishable from a regular direct style function
+call, with the particularity that the type of the result of the
+computation must be known ahead of time because at this point there is
+no way for it to deduce it automatically.
+</p>
+
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 7: </span><code>main</code> with <code>sync_wait</code></label><pre class="src src-C++" id="orgd4147eb"><span class="org-type">void</span> <span class="org-function-name">main</span>() {
+  <span class="org-keyword">auto</span> <span class="org-variable-name">result</span> = sync_wait&lt;<span class="org-type">double</span>&gt;(hypotenuse(2.0, 3.0));
+  <span class="org-constant">std</span>::println(<span class="org-string">"{}"</span>, result);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org595212c" class="outline-4">
+<h4 id="org595212c">Computational basis for computation</h4>
+<div class="outline-text-4" id="text-org595212c">
+<p>
+The compositional patterns developed so far: <code>just</code>, <code>let_value</code>,
+<code>then</code>, and <code>sync_wait</code> are almost enough to express all the ways in
+which computations can be composed together.  That is, they are enough
+to conform a computational basis for computation, with some caveats:
+</p>
+
+<ul class="org-ul">
+<li>No recursivity / iteration: <code>let_value</code> is missing some type erasure
+that would allow us to implement recursive / iterative patterns.
+This is intentionally left out of our implementation, for the
+pedagogical sake of simplicity.</li>
+
+<li>It is not a <i>minimal</i> computational basis: The <code>then</code> algorithm can
+be implemented in terms of <code>let_value</code>.  Regardless, it often makes
+sense to implement <code>then</code> independently of <code>let_value</code> for
+efficiency reasons.</li>
+
+<li>It is not an <i>efficient</i> computational basis: These algorithms,
+while sufficient to express dependencies between computations, they
+are hardly an efficient way to do so in every possible use
+case. E.g. if a computation depended on the result of several
+computations, with these computational basis we only have the option
+to execute them one-by-one, accumulating and forwarding the results
+via subsequent invocations to <code>let_value</code>.</li>
+</ul>
+
+
+<p>
+With respect to this last point, we could view the sender algorithms
+of <code>std::execution</code> as an attempt to provide an efficient
+computational basis.  In the search for efficiency, minimality is
+lost.
+</p>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.computational-basis-for-computation" class="footnum" href="#fnr.computational-basis-for-computation" role="doc-backlink">1</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+We could say that a model of
+computation provides a representation for the execution state and a
+finite set of procedures to operate on it (i.e. a computational basis
+for computation).  At least that line of reasoning makes sense in the
+computational models I am aware of (Turing machines, lambda calculus,
+SKI combinator calculus, abacus computing, general recursive
+functions).
+</p></div></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="creator"><a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.2 (<a href="https://orgmode.org">Org</a> mode 9.7.11)</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Exploring C++ =std::execution= 2</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="https://gongzhitaao.org/orgcss/org.css" />
+</head>
+<body>
+<div id="preamble" class="status">
+<div class='topnav'>
+                                     <a href='/index.html'>Home</a>
+                                     </div>
+</div>
+<div id="content" class="content">
+<h1 class="title">Exploring C++ <code>std::execution</code> 2</h1>
+<div id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org9a63ecf">Currying the callback arguments</a>
+<ul>
+<li><a href="#orgea6a568">Laziness and thunks</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org9a63ecf" class="outline-2">
+<h2 id="org9a63ecf">Currying the callback arguments</h2>
+<div class="outline-text-2" id="text-org9a63ecf">
+<p>
+<a id="org41bb391"></a>
+</p>
+
+<p>
+A (tbd-link)CPS function's parameter list holds two kinds of
+parameters: redex data and callbacks.  We would like to distinguish
+between them directly from the structure of the CPS function.
+Moreover, this mechanism should be uniform across all CPS functions.
+Such a <i>uniformity</i> eases the sort of generic programming that is
+heavily used throughout <code>std::execution</code>.
+</p>
+
+
+<p>
+<a href="https://en.wikipedia.org/wiki/Currying">Currying</a> the callback arguments achieves this goal, we refer to the
+transformed as <b>Curried CPS function (CCPS function)</b>.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 1: </span>CPS to CCPS: Callee</label><pre class="src src-C++" id="orgd4b2a2f"><span class="org-comment-delimiter">// </span><span class="org-comment">CPS
+</span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">CCPS
+</span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }; }  
+</pre>
+</div>
+
+<p>
+An important detail (at risk of being lost to its concise syntax) is
+that the implementation of the CCPS function returns a lambda that
+captures the function's arguments <i>by value</i>.  There is no other
+choice than to capture by value because references to the arguments
+dangle as soon as the curried CPS function returns.
+</p>
+
+
+<p>
+On the other hand, the call-site (Listing <a href="#org1603490">2</a>)
+can invoke the CCPS with a callback that captures by reference because
+the callback is invoked before the call expression is fully evaluated.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 2: </span>CPS to CCPS: Caller</label><pre class="src src-C++" id="org1603490"><span class="org-comment-delimiter">// </span><span class="org-comment">CPS
+</span><span class="org-keyword">return</span> sq(x, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> foo(sqx); });
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">CCPS
+</span><span class="org-keyword">return</span> sq(x)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> foo(sqx); });
+</pre>
+</div>
+
+
+<p>
+Applying this transformation to the <code>hypotenuse</code> example of Listing
+(tbd-link cps-hypotenuse) leads to the code shown below..
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 3: </span>Hypotenuse function written in curried CPS</label><pre class="src src-C++" id="orgbb1aa2f"><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }; }
+<span class="org-keyword">auto</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x + y); }; }
+<span class="org-keyword">auto</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(sqrt(x)); }; }
+<span class="org-keyword">auto</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+  <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
+    <span class="org-keyword">return</span> sq(x)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) {
+      <span class="org-keyword">return</span> sq(y)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqy</span>) {
+        <span class="org-keyword">return</span> add(sqx, sqy)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">r</span>) {
+          <span class="org-keyword">return</span> sqr(r)(cc);
+        });
+      });
+    });
+  };
+}
+</pre>
+</div>
+
+<p>
+If we bare with the ugliness of the code above for a second, we may
+notice that currying does indeed achieve a clear split between
+parameters used by the redex and the callbacks that represent the
+continuations.
+</p>
+
+
+<p>
+Invoking a function written in <i>curried CPS</i><sup><a id="fnr.curried-cps" class="footref" href="#fn.curried-cps" role="doc-backlink">1</a></sup> is two
+stepped:
+</p>
+
+<ol class="org-ol">
+<li>The curried CPS function is partially applied to the redex data.</li>
+<li>The partially applied curried CPS function is applied to the
+callbacks and execution of the redex begins.</li>
+</ol>
+
+<p>
+We can also think of the invocation of curried CPS functions in terms
+of finite state machines (FSM):
+</p>
+
+<ul class="org-ul">
+<li>When the curried CPS function has not yet been applied, the FSM is
+in a <b>non-configured</b> state.</li>
+
+<li>When the curried CPS function is partially applied to the redex
+data, the FSM transitions to a <b>disconnected</b> state.  At this point
+the redex does not begin execution, but all the information needed
+to do so is available.</li>
+
+<li>Finally, when the partially applied CPS function is appiled to the
+remaining callback arguments, the FSM transitions to the <b>started</b>
+state.  At this point execution of the redex begins.  Once the redex
+is resolved, one of the callbacks is applied to its result.</li>
+</ul>
+
+
+<div style="text-align: center;">
+
+<div id="org9fb5545" class="figure">
+<p><img src="images/curried-cps.png" alt="curried-cps.png" />
+</p>
+</div>
+
+</div>
+
+<p>
+Summarizing, before currying each CPS function required us to inspect
+its parameter list to figure out which parameters are required by the
+redex and which are callbacks.  Now this is always known from the
+structure of the curried CPS functions.
+</p>
+</div>
+<div id="outline-container-orgea6a568" class="outline-3">
+<h3 id="orgea6a568">Laziness and thunks</h3>
+<div class="outline-text-3" id="text-orgea6a568">
+<p>
+<a id="org5ba1bce"></a>
+</p>
+
+<p>
+Almost all introductions to <code>std::execution</code> claim its laziness fairly
+early on.  The purpose of the transformation presented in this section
+is to grant curried CPS functions the property of lazy execution.
+</p>
+
+
+<p>
+The rationale behind wanting laziness in an asynchronous programming
+framework has been thoroughly discussed and it would be too large of a
+tangent for this post.  In short, it eases the development and
+correctness verification of asynchronous programming patterns &#x2013; we
+have not defined any such pattern yet, but think of stuff like
+awaiting the result of several computations that were logically
+launched simultaneously. This <a href="https://youtu.be/1Wy5sq3s2rg?t=1559">Lewis Baker talk on structured
+concurrency</a> covers the issue quite well.
+</p>
+
+
+<p>
+The transformation relies on <i>thunks</i> to achieve the effect of
+attaching callbacks without evaluating the redex.  A thunk is a
+concept independent of all the CPS topics discussed so far.  Broadly
+speaking, it is a <a href="https://en.wikipedia.org/wiki/Closure_(computer_programming)">closure</a> with an empty parameter list.  This enables
+deferring the execution of whatever expression it encloses until the
+thunk is invoked with an empty argument list.  The transformation,
+applied to curried CPS functions is depicted in the listings below.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 4: </span>Curried CPS to lazy curried CPS: Callee</label><pre class="src src-C++" id="org38154fe"><span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
+</span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }; }
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS
+</span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(x * x); }; }; }    
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 5: </span>Curried CPS to lazy curried CPS: Caller</label><pre class="src src-C++" id="orga58d89a"><span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
+</span><span class="org-keyword">return</span> sq(x)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> foo(sqx); });
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS
+</span><span class="org-keyword">return</span> sq(x)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> foo(sqx); })();  
+</pre>
+</div>
+
+
+<p>
+Just like the curried callback parameter in the <a href="#orgd4b2a2f">previous section</a>, the
+thunk must capture by value.  This is to prevent dangling of both
+redex data and callback arguments.  Call-site rules change, however.
+Before thunks callbacks created at call-site could capture by
+reference safely.  Now only the caller that invokes the thunk can do
+so.  The problematic case is depicted in Listing
+<a href="#orgedf462b">6</a>.
+</p>
+
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 6: </span>Lazy curried CPS dangling at call-site</label><pre class="src src-C++" id="orgedf462b"><span class="org-comment-delimiter">/* </span><span class="org-comment">thunk_type</span><span class="org-comment-delimiter"> */</span> <span class="org-keyword">auto</span> <span class="org-function-name">sq_plus</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+  <span class="org-keyword">return</span> sq(x)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> sqx + y; });
+} <span class="org-comment-delimiter">// </span><span class="org-comment">ERROR! The callback has not been invoked yet, `y` has been destructed</span>
+</pre>
+</div>
+
+
+<p>
+In code that executes a sequence of lazy curried CPS functions, thunks
+require an invocation after each callback attachment.  This leads to a
+sort of <i>chain reaction</i> through the sequenced operations: the
+completion of one operation immediately starts the next one, as shown
+in Listing <a href="#org4617150">7</a>.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 7: </span>Hypotenuse function written in lazy curried CPS</label><pre class="src src-C++" id="org4617150"><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(x * x); }; }; }
+<span class="org-keyword">auto</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(x + y); }; }; }
+<span class="org-keyword">auto</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(sqrt(x)); }; }; }
+<span class="org-keyword">auto</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+  <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
+    <span class="org-keyword">return</span> [=]() {
+      <span class="org-keyword">return</span> sq(x)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) {
+        <span class="org-keyword">return</span> sq(y)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqy</span>) {
+          <span class="org-keyword">return</span> add(sqx, sqy)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">r</span>) {
+            <span class="org-keyword">return</span> sqr(r)(cc)();
+          })();
+        })();
+      })();
+    };
+  };
+}
+</pre>
+</div>
+
+<p>
+If we bare with the ugliness of the code above for a second, we may
+notice that these are lazily composed (sequenced) operations.  Similar
+in spirit to what <code>std::execution</code> promises.
+</p>
+
+
+<p>
+Invoking a function written in <i>lazy curried CPS</i><sup><a id="fnr.lazy-curried-cps" class="footref" href="#fn.lazy-curried-cps" role="doc-backlink">2</a></sup> is
+three stepped:
+</p>
+
+<ol class="org-ol">
+<li>The lazy curried CPS function is partially applied to the redex
+data.</li>
+<li>The partially applied lazy curried CPS function is applied to the callbacks
+and returns a thunk.</li>
+<li>The returned thunk is invoked and execution of the redex begins.</li>
+</ol>
+
+<p>
+We can also think of the invocation of lazy curried CPS functions in
+terms of finite state machines (FSM):
+</p>
+
+<ul class="org-ul">
+<li>When the lazy curried CPS function has not yet been applied, the FSM
+is in a <b>non-configured</b> state.</li>
+
+<li>When the lazy curried CPS function is partially applied to the redex
+arguments, the FSM transitions to a <b>disconnected</b> state.  At this
+point the redex does not begin execution, but all the information
+needed to do so is available.</li>
+
+<li>When the partially applied lazy curried CPS function is appiled to
+the remaining callback arguments, the FSM transitions to the
+<b>connected</b> state and a thunk is created to defer execution.</li>
+
+<li>Finally, when the thunk is invoked, the execution of the redex
+begins.  Once the redex is resolved, one of the callbacks is applied
+to its result.</li>
+</ul>
+
+
+<div style="text-align: center;">
+
+<div id="org2761ff4" class="figure">
+<p><img src="images/lazy-curried-cps.png" alt="lazy-curried-cps.png" />
+</p>
+</div>
+
+</div>
+
+
+<p>
+At this point the simplified framework has almost everything it needs,
+functionally at least.  We still need to deal with its ugliness, as it
+would be very naive to expect code like that of Listing
+<a href="#org4617150">7</a> to be maintainable or even
+pleasant to read.
+</p>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.curried-cps" class="footnum" href="#fnr.curried-cps" role="doc-backlink">1</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+Unlike CPS, curried CPS is non standard nomenclature.
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.lazy-curried-cps" class="footnum" href="#fnr.lazy-curried-cps" role="doc-backlink">2</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+Unlike CPS, lazy curried CPS is non standard
+nomenclature.
+</p></div></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="creator"><a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.2 (<a href="https://orgmode.org">Org</a> mode 9.7.11)</p>
+</div>
+</body>
+</html>
