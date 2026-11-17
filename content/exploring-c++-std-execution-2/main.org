@@ -1,0 +1,281 @@
+#+title: Exploring C++ =std::execution= 2
+#+author: Gonzalo Juarez
+
+* Currying the callback arguments
+<<subsec:currying>>
+
+A (tbd-link)CPS function's parameter list holds two kinds of
+parameters: redex data and callbacks.  We would like to distinguish
+between them directly from the structure of the CPS function.
+Moreover, this mechanism should be uniform across all CPS functions.
+Such a /uniformity/ eases the sort of generic programming that is
+heavily used throughout =std::execution=.
+
+
+[[Https://en.wikipedia.org/wiki/Currying][Currying]] the callback arguments achieves this goal, we refer to the
+transformed as *Curried CPS function (CCPS function)*.
+
+#+NAME: listing:curry-cps-callee
+#+CAPTION: CPS to CCPS: Callee
+#+BEGIN_SRC C++
+  // CPS
+  auto sq(double x, auto cc) { return cc(x * x); }
+
+  // CCPS
+  auto sq(double x) { return [=](auto cc) { return cc(x * x); }; }  
+#+END_SRC
+
+An important detail (at risk of being lost to its concise syntax) is
+that the implementation of the CCPS function returns a lambda that
+captures the function's arguments /by value/.  There is no other
+choice than to capture by value because references to the arguments
+dangle as soon as the curried CPS function returns.
+
+
+On the other hand, the call-site (Listing [[listing:curry-cps-caller]])
+can invoke the CCPS with a callback that captures by reference because
+the callback is invoked before the call expression is fully evaluated.
+
+#+NAME: listing:curry-cps-caller
+#+CAPTION: CPS to CCPS: Caller
+#+BEGIN_SRC C++
+  // CPS
+  return sq(x, [&](double sqx) { return foo(sqx); });
+
+  // CCPS
+  return sq(x)([&](double sqx) { return foo(sqx); });
+#+END_SRC
+
+
+Applying this transformation to the =hypotenuse= example of Listing
+(tbd-link cps-hypotenuse) leads to the code shown below..
+
+#+NAME: listing:curried-cps-hypotenuse
+#+CAPTION: Hypotenuse function written in curried CPS
+#+BEGIN_SRC C++
+auto sq(double x) { return [=](auto cc) { return cc(x * x); }; }
+auto add(double x, double y) { return [=](auto cc) { return cc(x + y); }; }
+auto sqr(double x) { return [=](auto cc) { return cc(sqrt(x)); }; }
+auto hypotenuse(double x, double y) {
+  return [=](auto cc) {
+    return sq(x)([&](double sqx) {
+      return sq(y)([&](double sqy) {
+        return add(sqx, sqy)([&](double r) {
+          return sqr(r)(cc);
+        });
+      });
+    });
+  };
+}
+#+END_SRC
+
+If we bare with the ugliness of the code above for a second, we may
+notice that currying does indeed achieve a clear split between
+parameters used by the redex and the callbacks that represent the
+continuations.
+
+
+Invoking a function written in /curried CPS/[fn:curried-cps] is two
+stepped:
+
+1. The curried CPS function is partially applied to the redex data.
+2. The partially applied curried CPS function is applied to the
+   callbacks and execution of the redex begins.
+
+[fn:curried-cps] Unlike CPS, curried CPS is non standard nomenclature.
+
+
+We can also think of the invocation of curried CPS functions in terms
+of finite state machines (FSM):
+
+- When the curried CPS function has not yet been applied, the FSM is
+  in a *non-configured* state.
+
+- When the curried CPS function is partially applied to the redex
+  data, the FSM transitions to a *disconnected* state.  At this point
+  the redex does not begin execution, but all the information needed
+  to do so is available.
+
+- Finally, when the partially applied CPS function is appiled to the
+  remaining callback arguments, the FSM transitions to the *started*
+  state.  At this point execution of the redex begins.  Once the redex
+  is resolved, one of the callbacks is applied to its result.
+
+
+#+BEGIN_EXPORT html
+<div style="text-align: center;">
+#+END_EXPORT
+#+NAME: figure:curried-cps-fsm
+#+CAPTION: Curried CPS state machine
+#+BEGIN_SRC dot :file images/curried-cps.png :cmdline -Kdot -Tpng :exports results
+  digraph G {
+    initial [shape=point, width=0.15, label=""];
+    initial -> "Non-configured";
+    "Non-configured" -> Disconnected [label=" redex data"];
+    Disconnected -> Started [label=" callbacks"];
+  }
+#+END_SRC
+#+BEGIN_EXPORT html
+</div>
+#+END_EXPORT
+
+Summarizing, before currying each CPS function required us to inspect
+its parameter list to figure out which parameters are required by the
+redex and which are callbacks.  Now this is always known from the
+structure of the curried CPS functions.
+
+** Laziness and thunks
+<<sec:laziness-and-thunks>>
+
+Almost all introductions to =std::execution= claim its laziness fairly
+early on.  The purpose of the transformation presented in this section
+is to grant curried CPS functions the property of lazy execution.
+
+
+The rationale behind wanting laziness in an asynchronous programming
+framework has been thoroughly discussed and it would be too large of a
+tangent for this post.  In short, it eases the development and
+correctness verification of asynchronous programming patterns -- we
+have not defined any such pattern yet, but think of stuff like
+awaiting the result of several computations that were logically
+launched simultaneously. This [[https://youtu.be/1Wy5sq3s2rg?t=1559][Lewis Baker talk on structured
+concurrency]] covers the issue quite well.
+
+
+The transformation relies on /thunks/ to achieve the effect of
+attaching callbacks without evaluating the redex.  A thunk is a
+concept independent of all the CPS topics discussed so far.  Broadly
+speaking, it is a [[https://en.wikipedia.org/wiki/Closure_(computer_programming)][closure]] with an empty parameter list.  This enables
+deferring the execution of whatever expression it encloses until the
+thunk is invoked with an empty argument list.  The transformation,
+applied to curried CPS functions is depicted in the listings below.
+
+#+NAME: listing:lazy-curry-cps-callee
+#+CAPTION: Curried CPS to lazy curried CPS: Callee
+#+BEGIN_SRC C++
+  // Curried CPS
+  auto sq(double x) { return [=](auto cc) { return cc(x * x); }; }
+
+  // Lazy curried CPS
+  auto sq(double x) { return [=](auto cc) { return [=]() { return cc(x * x); }; }; }    
+#+END_SRC
+
+
+#+NAME: listing:lazy-curry-cps-caller
+#+CAPTION: Curried CPS to lazy curried CPS: Caller
+#+BEGIN_SRC C++
+  // Curried CPS
+  return sq(x)([&](double sqx) { return foo(sqx); });
+
+  // Lazy curried CPS
+  return sq(x)([&](double sqx) { return foo(sqx); })();  
+#+END_SRC
+
+
+Just like the curried callback parameter in the [[listing:curry-cps-callee][previous section]], the
+thunk must capture by value.  This is to prevent dangling of both
+redex data and callback arguments.  Call-site rules change, however.
+Before thunks callbacks created at call-site could capture by
+reference safely.  Now only the caller that invokes the thunk can do
+so.  The problematic case is depicted in Listing
+[[listing:lazy-curry-cps-caller-dangling]].
+
+
+#+NAME: listing:lazy-curry-cps-caller-dangling
+#+CAPTION: Lazy curried CPS dangling at call-site
+#+BEGIN_SRC C++
+  /* thunk_type */ auto sq_plus(double x, double y) {
+    return sq(x)([&](double sqx) { return sqx + y; });
+  } // ERROR! The callback has not been invoked yet, `y` has been destructed
+#+END_SRC
+
+
+In code that executes a sequence of lazy curried CPS functions, thunks
+require an invocation after each callback attachment.  This leads to a
+sort of /chain reaction/ through the sequenced operations: the
+completion of one operation immediately starts the next one, as shown
+in Listing [[listing:lazy-curried-cps-hypotenuse]].
+
+#+NAME: listing:lazy-curried-cps-hypotenuse
+#+CAPTION: Hypotenuse function written in lazy curried CPS
+#+BEGIN_SRC C++
+auto sq(double x) { return [=](auto cc) { return [=]() { return cc(x * x); }; }; }
+auto add(double x, double y) { return [=](auto cc) { return [=]() { return cc(x + y); }; }; }
+auto sqr(double x) { return [=](auto cc) { return [=]() { return cc(sqrt(x)); }; }; }
+auto hypotenuse(double x, double y) {
+  return [=](auto cc) {
+    return [=]() {
+      return sq(x)([&](double sqx) {
+        return sq(y)([&](double sqy) {
+          return add(sqx, sqy)([&](double r) {
+            return sqr(r)(cc)();
+          })();
+        })();
+      })();
+    };
+  };
+}
+#+END_SRC
+
+If we bare with the ugliness of the code above for a second, we may
+notice that these are lazily composed (sequenced) operations.  Similar
+in spirit to what =std::execution= promises.
+
+
+Invoking a function written in /lazy curried CPS/[fn:lazy-curried-cps] is
+three stepped:
+
+1. The lazy curried CPS function is partially applied to the redex
+   data.
+2. The partially applied lazy curried CPS function is applied to the callbacks
+   and returns a thunk.
+3. The returned thunk is invoked and execution of the redex begins.
+
+[fn:lazy-curried-cps] Unlike CPS, lazy curried CPS is non standard
+nomenclature.
+
+
+We can also think of the invocation of lazy curried CPS functions in
+terms of finite state machines (FSM):
+
+- When the lazy curried CPS function has not yet been applied, the FSM
+  is in a *non-configured* state.
+
+- When the lazy curried CPS function is partially applied to the redex
+  arguments, the FSM transitions to a *disconnected* state.  At this
+  point the redex does not begin execution, but all the information
+  needed to do so is available.
+
+- When the partially applied lazy curried CPS function is appiled to
+  the remaining callback arguments, the FSM transitions to the
+  *connected* state and a thunk is created to defer execution.
+
+- Finally, when the thunk is invoked, the execution of the redex
+  begins.  Once the redex is resolved, one of the callbacks is applied
+  to its result.
+
+
+#+BEGIN_EXPORT html
+<div style="text-align: center;">
+#+END_EXPORT
+#+NAME: figure:lazy-curried-cps-fsm
+#+CAPTION: Lazy curried CPS state machine
+#+BEGIN_SRC dot :file images/lazy-curried-cps.png :cmdline -Kdot -Tpng :exports results
+   digraph G {
+     initial [shape=point, width=0.15, label=""];
+     initial -> "Non-configured";
+     "Non-configured" -> Disconnected [label=" redex data"];
+     Disconnected -> Connected [label=" callbacks"];
+     Connected -> Started [label=" thunk invocation"];
+   }
+#+END_SRC
+#+BEGIN_EXPORT html
+</div>
+#+END_EXPORT
+
+
+At this point the simplified framework has almost everything it needs,
+functionally at least.  We still need to deal with its ugliness, as it
+would be very naive to expect code like that of Listing
+[[listing:lazy-curried-cps-hypotenuse]] to be maintainable or even
+pleasant to read.

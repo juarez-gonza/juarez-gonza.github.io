@@ -1,0 +1,249 @@
+* Computational basis & compositional patterns
+
+In Elements of Programming, a *computational basis for a type* is
+defined as the finite set of procedures that enable the construction
+of any other procedure on the type.  In other words, these procedures
+can be [[https://en.wikipedia.org/wiki/Function_composition_(computer_science)][functionally composed]] to obtain any other procedure on the
+type.  For example, for unsigned integers a computational basis could
+be =zero=, =operator===, and =successor= functions (let us ignore the
+efficiency aspect for now).
+
+
+We can reformulate the notion of computational basis for types to
+obtain the notion of *computational basis for computation* itself.  The
+procedures on computations are simply the compositional patterns that
+enable constructing larger computations from smaller ones.  A
+computational basis for computation is a finite set of compositional
+patterns from which every other compositional pattern can be
+obtained [fn:computational-basis-for-computation].
+
+
+[fn:computational-basis-for-computation] We could say that a model of
+computation provides a representation for the execution state and a
+finite set of procedures to operate on it (i.e. a computational basis
+for computation).  At least that line of reasoning makes sense in the
+computational models I am aware of (Turing machines, lambda calculus,
+SKI combinator calculus, abacus computing, general recursive
+functions).
+
+
+Since the redex and continuations we have been abstracting over are a
+way to represent computations, these facts about compositional
+patterns and computational basis apply to the framework we have
+developed throughout the last few sections.  We can readily identify a
+basis in Listing (tbd-link)lazy curried cps hypotenuse: lifting and
+sequencing.  We will use these patterns to remove noise from the
+running example, making it more maintainable and aesthetically
+pleasing.
+
+*** Lifting
+
+Lifting in the context of CPS occurs whenever we want to carry some
+data from the direct style world to the CPS world. In Listing
+(tbd-link)lazy cps curried hypotenuse this occurs to the arguments of
+=hypotenuse=, which are lifted in =sq=, =add=, =sqr= before their
+usage in the redex expressions.  The general pattern is implemented in
+the listing below.
+
+#+NAME: listing:just
+#+CAPTION: Lifting with =just=
+#+BEGIN_SRC C++
+auto just(auto value) {
+  return [=](auto cc) {
+    return [=]() {
+      return cc(value);
+    };
+  };
+}
+#+END_SRC
+
+
+The code is straightforward, the function =just= is in lazy curried
+CPS and it simply captures a value and forwards it to the
+user-provided callback.
+
+
+*** Sequencing
+
+A basic compositional pattern between computations is using the
+outputs of one computation as the inputs of the next computation.  The
+function in Listing (tbd-link)let value, =let_value=, captures this pattern.
+
+#+NAME: listing:let_value
+#+CAPTION: Sequencing with =let_value=
+#+BEGIN_SRC C++
+auto let_value(auto f_disconnected, auto g_nonconfig) {
+  return [=](auto cc) {
+    return [=]() {
+      auto f_connected = f_disconnected([=](auto f_ret) {
+        auto g_disconnected = g_nonconfig(f_ret);
+        auto g_connected = g_disconnected(cc);
+        return g_connected();
+      });
+      return f_connected();
+    };
+  };
+}
+#+END_SRC
+
+
+The names chosen for the parameters and variables of Listing
+(tbd-link)let value reference the states of the state machine used to
+understand the application of lazy curried CPS in the (tbd-link
+laziness and thunks)previous section.  Both parameters are functions
+written in lazy curried CPS, but =f_disconnected= has been already
+partially applied to its redex data by the time =let_value= is applied
+to it, while =g_nonconfig= has no arguments available to it.  When
+started, =let_value= executes the computation enclosed by
+=f_disconnected= and forwards its result as the redex data of
+=g_nonconfig=, obtaining =g_disconnected=.  The callback argument of
+=let_value= is then attached to =g_disconnected=, and the resulting
+thunk is immediately invoked.
+
+
+With =let_value= and =just= at hand, we can already improve the
+readability of the running example quite a bit. Listing
+[[listing:example-refactor-with-let-value-and-just]] shows the refactor of =sq=.
+
+
+#+NAME: listing:example-refactor-with-let-value-and-just
+#+CAPTION: Refactor of =sq= with =let_value= and =just=
+#+BEGIN_SRC C++
+// Lazy curried CPS
+auto sq(double x) { return [=](auto cc) { return [=]() { return cc(x * x); }; }; }
+
+// Lazy curried CPS with let_value and just
+auto sq(double x) {
+  return let_value(just(make_pair(x, x)), [](auto xy) { return just(mul_(xy)); });
+}
+// where mul_ is:
+auto mul_(auto xy) { return std::apply(std::multiplies{}, xy); }  
+#+END_SRC
+
+In the resulting code, the mechanism by which lazy curried CPS works
+is made implicit, giving more exposure to the computations themselves
+and the way in which they compose.  Just like using STL algorithms
+makes the intent of code clearer than the equivalent code using raw
+loops, we argue that code that uses compositional patterns makes the
+intent of code clearer than the equivalent using raw CPS.  This claim
+might make more sense once we show the full =hypotenuse= example
+refactored, after developing the =then= algorithm.
+
+
+*** Mapping
+
+The compositional pattern between =sq= and =mul_= in the [[listing:example-refactor-with-let-value-and-just][previous
+section]] is common to =sq=, =add=, and =sqr=.  It is captured by the
+=then= algorithm.  This algorithm can be seen as a lifting from direct
+style to CPS, like =just=, but for mapping functions (functions
+suitable for =std::transform=) instead of data.  Its only purpose is
+to apply a mapping function to the output of a previous computation
+before forwarding the mapped value as input of the next computation.
+
+#+NAME: listing:then
+#+CAPTION: Mapping with =then=
+#+BEGIN_SRC C++
+  auto then(auto f_disconnected, auto map) {
+    return [=](auto cc) {
+      return [=]() {
+        return f_disconnected([](auto x) {
+  	return cc(map(x));
+        })();
+      };
+    };
+  }
+#+END_SRC
+
+The running example, after applying these compositional patterns, is
+shown in Listing [[listing:cps-compositional-patterns-hypotenuse]].
+
+#+NAME: listing:cps-compositional-patterns-hypotenuse
+#+CAPTION: Hypotenuse function written with CPS compositional patterns
+#+BEGIN_SRC C++
+// mul_, add_, sqrt_ are the usual arithmetic operations.
+// binary operations taking a pair instead of two args
+
+auto sq(double x) { return then(just(make_pair(x, x)), mul_); }
+auto add(double x, double y) { return then(just(make_pair(x, y)), add_); }
+auto sqr(double x) { return then(just(x), sqrt_); }
+auto hypotenuse(double x, double y) {
+  return let_value(sq(x), [=](double sqx) {
+    return let_value(sq(y), [=](double sqy) {
+      return let_value(add(sqx, sqy), [=](double r) {
+        return sqr(r);
+      });
+    });
+  });
+}
+#+END_SRC
+
+
+*** What about main? Revisited
+
+We have (tbd-link what about main) already discussed =main= being a bridge between direct style
+and CPS.  The compositional pattern that achieves this "bridging" is
+=sync_wait=.  Its implementation simply triggers the thunk of the
+previous computation after attaching a callback that "leaks" the
+result of the previous computation into the direct style world (see
+Listing [[listing:sync-wait]]).
+
+
+#+NAME: listing:sync-wait
+#+CAPTION: Back to direct style with =sync_wait=
+#+BEGIN_SRC C++
+  template<typename Ret>
+  Ret sync_wait(auto f_disconnected) {
+    std::optional<Ret> value;
+    auto thunk = f_disconnected([&](Ret x) { value.emplace(x); });
+    thunk();
+    assert(value.has_value() and "Completion did not populate return value");
+    return *value;
+  }
+#+END_SRC
+
+
+Its usage is indistinguishable from a regular direct style function
+call, with the particularity that the type of the result of the
+computation must be known ahead of time because at this point there is
+no way for it to deduce it automatically.
+
+
+#+NAME: listing:main-with-sync-wait
+#+CAPTION: =main= with =sync_wait=
+#+BEGIN_SRC C++
+  void main() {
+    auto result = sync_wait<double>(hypotenuse(2.0, 3.0));
+    std::println("{}", result);
+  }
+#+END_SRC
+
+*** Computational basis for computation
+
+The compositional patterns developed so far: =just=, =let_value=,
+=then=, and =sync_wait= are almost enough to express all the ways in
+which computations can be composed together.  That is, they are enough
+to conform a computational basis for computation, with some caveats:
+
+- No recursivity / iteration: =let_value= is missing some type erasure
+  that would allow us to implement recursive / iterative patterns.
+  This is intentionally left out of our implementation, for the
+  pedagogical sake of simplicity.
+
+- It is not a /minimal/ computational basis: The =then= algorithm can
+  be implemented in terms of =let_value=.  Regardless, it often makes
+  sense to implement =then= independently of =let_value= for
+  efficiency reasons.
+
+- It is not an /efficient/ computational basis: These algorithms,
+  while sufficient to express dependencies between computations, they
+  are hardly an efficient way to do so in every possible use
+  case. E.g. if a computation depended on the result of several
+  computations, with these computational basis we only have the option
+  to execute them one-by-one, accumulating and forwarding the results
+  via subsequent invocations to =let_value=.
+
+
+With respect to this last point, we could view the sender algorithms
+of =std::execution= as an attempt to provide an efficient
+computational basis.  In the search for efficiency, minimality is
+lost.
