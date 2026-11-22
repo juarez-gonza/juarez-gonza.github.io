@@ -1,25 +1,45 @@
 #+title: Exploring C++ =std::execution= 0
 #+author: Gonzalo Juarez
 
-This post is the first entry in a series of posts dissecting C++
-=std::execution=: the framework for asynchronous computation proposed
-for standardization.  The main purpose of the series is to develop an
-understanding of =std::execution='s API and the
-rationale behind it from first principles (or at least my understanding of it).
-
-We begin with the bare basics: continuations in their most basic form.
+This post is the first entry in a series of posts dissecting C++ the
+framework for asynchronous computation proposed for standardization:
+=std::execution=.  The main purpose of the series is to develop an
+understanding of =std::execution='s API and the rationale behind it
+from first principles -- or at least my understanding of it.
 
 * Computation and continuations
 
-A computation can be intuitively defined as a process by which some
-inputs are converted into some outputs by executing a set of steps one
-after the other[fn:computation-model].  At any given time, the execution
-state of a computation can be subdivided into two: already executed
-steps and to-be-executed steps.  To-be-executed steps can be further
-subdivided into the next /immediate/ step to be executed, and the
-remaining /non-immediate/ steps to be executed.  The former step is
-known as the *reducible expression* (redex for short) and the latter
-steps conform what is referred to as the *continuation*.
+We begin with the bare basics: continuations in their most simple
+form.
+
+A *computation* can be intuitively understood as a process by which
+some inputs are converted into some outputs by executing a set of
+steps one after the other[fn:computation-model].  At any given time, the
+*execution state* of a computation is composed of two kinds of steps:
+already executed steps and to-be-executed steps.  To-be-executed steps
+can be further subdivided into the next immediate step to be executed,
+and the remaining non-immediate steps to be executed.  The former step
+is known as the *reducible expression* (redex for short) and the
+latter steps conform what is referred to as the *continuation*.
+
+
+#+BEGIN_EXPORT html
+<div style="text-align: center;">
+#+END_EXPORT
+#+NAME: figure:computation
+#+CAPTION: Execution state, continuation, and redex
+#+BEGIN_SRC dot :file images/computation-continuation-redex.png :cmdline -Kdot -Tpng :exports results
+  digraph G {
+    node [shape=box];  
+    "Execution state of computation" -> "Executed steps";
+    "Execution state of computation" -> "To-be-executed steps";
+    "To-be-executed steps" -> "Redex\n";
+    "To-be-executed steps" -> "Continuation";
+  }
+#+END_SRC
+#+BEGIN_EXPORT html
+</div>
+#+END_EXPORT
 
 
 [fn:computation-model] A more theoretical definition would involve a
@@ -27,18 +47,6 @@ model of computation such as Turing machines, general recursive
 functions, or lambda calculus.  But it is not the intention of this
 post to be as precise with these details when the general idea can be
 (almost) entirely captured by simpler terminology.
-
-
-The wording of the previous paragraph is intentionally vague.  This is
-to prevent its understanding in terms that are too concrete for the
-level of reasoning we are aiming for.  If in place of the word "steps"
-the paragraph used the word "instructions", then for us programmers
-this could be easily (mis)understood as a definition of reducible
-expressions and continuations in terms of CPU instructions.  While CPU
-instructions could be thought of as steps, they are far from the only
-abstraction level at which we would like to apply these ideas.  The
-following examples should clarify the situation.
-
 
 ** Example 1: Arithmetic expressions
 
@@ -58,6 +66,36 @@ The expression we are left with, =1 + 6=, has one single step to be
 executed and an empty continuation (no non-immediate next steps).  In
 other words, after executing the redex, the computation is /done/.
 
+
+#+BEGIN_EXPORT html
+<div style="text-align: center;">
+#+END_EXPORT
+#+NAME: figure:example-1
+#+CAPTION: Continuation and redex in Example 1
+#+BEGIN_SRC dot :file images/example-1.png :cmdline -Kdot -Tpng :exports results
+  digraph G {
+    node [shape=box];  
+
+
+    state [label=<Execution state of<BR/>1 + 2 * 3>];
+
+    executed [label=<Executed steps:<BR/>none>];
+
+    todo [label=<To-be-executed steps:<BR/>1 + 2 * ...>];
+
+    redex [label=<Redex:<BR/>2 * ...>];
+
+    continuation [label=<Continuation:<BR/>1 + ...>];
+
+    state -> executed;
+    state -> todo;
+    todo -> redex;
+    todo -> continuation;
+  }
+#+END_SRC
+#+BEGIN_EXPORT html
+</div>
+#+END_EXPORT
 
 This silly example already shows a key property of continuations: they
 are comprised not solely of operational descriptions (=+=), but also
@@ -82,13 +120,42 @@ Consider
   auto r = sqx + sqy;
 #+END_SRC
 
-A valid execution state has the statement in line 1 as its redex and
-statements of lines 2 and 3 conform its continuation.
+A valid execution state has the statement in line 2 as its redex and
+statements of lines 3 as its continuation.
 
 
-Disregarding practicality, it does not really matter how granular
-(abstract) a step is when discussing continuations as long as we are
-consistent.
+#+BEGIN_EXPORT html
+<div style="text-align: center;">
+#+END_EXPORT
+#+NAME: figure:example-2
+#+CAPTION: Continuation and redex in Example 2
+#+BEGIN_SRC dot :file images/example-2.png :cmdline -Kdot -Tpng :exports results
+  digraph G {
+    node [shape=box];  
+
+    state [label=<Execution state of<BR/>auto sqx = x * x;<BR/>auto sqy = y * y;<BR/>auto r = sqx + sqy;>];
+
+    executed [label=<Executed steps:<BR/>auto sqx = x * x;>];
+
+    todo [label=<To-be-executed steps:<BR/>auto sqy = y * y;<BR/>auto r = sqx + sqy;>];
+
+    redex [label=<Redex:<BR/>auto sqy = y * y;>];
+
+    continuation [label=<Continuation:<BR/>auto r = sqx + sqy;>];
+
+    state -> executed;
+    state -> todo;
+    todo -> redex;
+    todo -> continuation;
+  }
+#+END_SRC
+#+BEGIN_EXPORT html
+</div>
+#+END_EXPORT
+
+Disregarding practicality, it does not really matter how granular or
+abstract a step is taken to be when describing a computation, we can
+still categorize the parts of the execution state.
 
 ** Example 3: Function boundaries
 
@@ -106,45 +173,88 @@ double hypotenuse(double x, double y) {
   return sqrt(r);
 }
 #+END_SRC
-If =sq(x)= is the redex of an execution state, then its continuation
+If the execution state has =sq(x)= as its redex, then its continuation
 is conformed by the assignment to =sqx=, statements of lines 5, 6 and
 7, and whatever the caller of =hypotenuse= does after =hypotenuse=
-returns.  Notice that we treated =sq(x)= as a single step, ignoring
-the complexity of the implementation of =sq=.
+returns.
 
 
-The notion being stressed throughout these first three examples, is
-that of continuations being "whatever remains to be executed",
-regardless of the abstraction level at which we decide to operate in.
+Unlike the preceding examples, where steps where always of the same
+kind (arithmetic expressions and statements, respectively), here we
+have characterized the steps of a computation using a mixture of
+function call expressions, assignments, statements, and whatever the
+caller executes after returning from =hypotenuse=.  So not only can we
+take the steps that characterize a computation to be as coarse or fine
+grained as we want -- as shown by Example 2 --, but we can also mix
+and match the granularity of the steps with which we describe a single
+computation.
 
 
-Before dealing with more interesting stuff, the final example displays
-some more key properties of continuations.
+Regardless of the abstraction level at which we decide to operate in,
+the continuations can always be thought of as "whatever remains to be
+executed", and the redex as "whatever is immediately executed".
+
+
+The next example shows some more revelant properties of continuations
+and programs.
 
 ** Example 4: Conditional branches
 <<conditional-branches>>
 
-Consider the code listing below.  What is the continuation when line
-=1= is the redex?  Is it necessary to know the result of =rand() % 2=
-to determine the continuation?
+Consider the ternary expression =rand() % 2 ? foo() : bar()=.  What is
+the continuation when the redex is =rand() % 2=.  Is it necessary to
+know the result of =rand() % 2= to determine the continuation?
 
-#+NAME: listing:example-4
-#+CAPTION: Example 4
-#+BEGIN_SRC C++ -n
-  if (rand() % 2) {
-    return foo();
-  } else {
-    return bar();
+#+BEGIN_EXPORT html
+<div style="text-align: center;">
+#+END_EXPORT
+#+NAME: figure:example-4
+#+CAPTION: Continuation and redex in Example 4
+#+BEGIN_SRC dot :file images/example-4.png :cmdline -Kdot -Tpng :exports results
+  digraph G {
+    node [shape=box];  
+
+    state [label=<Execution state of<BR/>rand() % 2 ? foo() : bar()>];
+
+    executed [label=<Executed steps:<BR/>none>];
+
+    todo [label=<To-be-executed steps:<BR/>rand() % 2 ? foo() : bar()>];
+
+    redex [label=<Redex:<BR/>rand() % 2>];
+
+    continuation1 [label=<Continuation case true:<BR/>foo()>];
+
+    continuation2 [label=<Continuation case false:<BR/>bar()>];    
+
+    state -> executed;
+    state -> todo;
+    todo -> redex;
+    todo -> continuation1;
+    todo -> continuation2;
   }
 #+END_SRC
+#+BEGIN_EXPORT html
+</div>
+#+END_EXPORT
+
+
 This is a tricky question.  There is no such thing as /the/
 continuation at this point in the execution, but rather two (!)
-continuations.  After evaluating the conditional, one continuation is
-/discarded/ and the other one is applied.
-
+continuations (as depicted above).  After evaluating the conditional,
+one continuation is /discarded/ and the other one is applied.
 
 This example, short as it is, illustrates three more properties of
 continuations: (1) there is not necessarily one continuation at any
 given time; (2) continuations do not have to be applied, they can be
 discarded; and (3) a continuation may be applied or discarded based on
 runtime information.
+
+
+* Next steps
+
+In this post we have settled some basics of continutions and their
+properties via examples.  The continutaions we have dealt with,
+however, are not very interesting in the sense that we cannot /do/
+anything with them.  Throughout the next few posts we will explore
+continuation passing style, from which we will develop a basic form of
+=std::execution=.
