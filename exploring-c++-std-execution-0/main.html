@@ -21,59 +21,58 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org13742d5">Computation and continuations</a>
+<li><a href="#org13f1872">Computation and continuations</a>
 <ul>
-<li><a href="#org125e8bd">Example 1: Arithmetic expressions</a></li>
-<li><a href="#orgd4c1fdd">Example 2: Subsequent statements</a></li>
-<li><a href="#orgc09882c">Example 3: Function boundaries</a></li>
-<li><a href="#org607c2f2">Example 4: Conditional branches</a></li>
+<li><a href="#orgc9402d8">Example 1: Arithmetic expressions</a></li>
+<li><a href="#org383a35d">Example 2: Subsequent statements</a></li>
+<li><a href="#orgc022d5a">Example 3: Function boundaries</a></li>
+<li><a href="#orgf33f30f">Example 4: Conditional branches</a></li>
 </ul>
 </li>
+<li><a href="#org6679a0f">Next steps</a></li>
 </ul>
 </div>
 </div>
 <p>
-This post is the first entry in a series of posts dissecting C++
-<code>std::execution</code>: the framework for asynchronous computation proposed
-for standardization.  The main purpose of the series is to develop an
-understanding of <code>std::execution</code>'s API and the
-rationale behind it from first principles (or at least my understanding of it).
+This post is the first entry in a series of posts dissecting C++ the
+framework for asynchronous computation proposed for standardization:
+<code>std::execution</code>.  The main purpose of the series is to develop an
+understanding of <code>std::execution</code>'s API and the rationale behind it
+from first principles &#x2013; or at least my understanding of it.
+</p>
+<div id="outline-container-org13f1872" class="outline-2">
+<h2 id="org13f1872">Computation and continuations</h2>
+<div class="outline-text-2" id="text-org13f1872">
+<p>
+We begin with the bare basics: continuations in their most simple
+form.
 </p>
 
 <p>
-We begin with the bare basics: continuations in their most basic form.
-</p>
-<div id="outline-container-org13742d5" class="outline-2">
-<h2 id="org13742d5">Computation and continuations</h2>
-<div class="outline-text-2" id="text-org13742d5">
-<p>
-A computation can be intuitively defined as a process by which some
-inputs are converted into some outputs by executing a set of steps one
-after the other<sup><a id="fnr.computation-model" class="footref" href="#fn.computation-model" role="doc-backlink">1</a></sup>.  At any given time, the execution
-state of a computation can be subdivided into two: already executed
-steps and to-be-executed steps.  To-be-executed steps can be further
-subdivided into the next <i>immediate</i> step to be executed, and the
-remaining <i>non-immediate</i> steps to be executed.  The former step is
-known as the <b>reducible expression</b> (redex for short) and the latter
-steps conform what is referred to as the <b>continuation</b>.
+A <b>computation</b> can be intuitively understood as a process by which
+some inputs are converted into some outputs by executing a set of
+steps one after the other<sup><a id="fnr.computation-model" class="footref" href="#fn.computation-model" role="doc-backlink">1</a></sup>.  At any given time, the
+<b>execution state</b> of a computation is composed of two kinds of steps:
+already executed steps and to-be-executed steps.  To-be-executed steps
+can be further subdivided into the next immediate step to be executed,
+and the remaining non-immediate steps to be executed.  The former step
+is known as the <b>reducible expression</b> (redex for short) and the
+latter steps conform what is referred to as the <b>continuation</b>.
 </p>
 
 
-<p>
-The wording of the previous paragraph is intentionally vague.  This is
-to prevent its understanding in terms that are too concrete for the
-level of reasoning we are aiming for.  If in place of the word "steps"
-the paragraph used the word "instructions", then for us programmers
-this could be easily (mis)understood as a definition of reducible
-expressions and continuations in terms of CPU instructions.  While CPU
-instructions could be thought of as steps, they are far from the only
-abstraction level at which we would like to apply these ideas.  The
-following examples should clarify the situation.
+<div style="text-align: center;">
+
+<div id="org614ef17" class="figure">
+<p><img src="images/computation-continuation-redex.png" alt="computation-continuation-redex.png" />
 </p>
 </div>
-<div id="outline-container-org125e8bd" class="outline-3">
-<h3 id="org125e8bd">Example 1: Arithmetic expressions</h3>
-<div class="outline-text-3" id="text-org125e8bd">
+
+</div>
+</div>
+<div id="outline-container-orgc9402d8" class="outline-3">
+<h3 id="orgc9402d8">Example 1: Arithmetic expressions</h3>
+<div class="outline-text-3" id="text-orgc9402d8">
 <p>
 Given the expression <code>1 + 2 * 3</code>, the usual precedence rules tell us
 that the first step to be executed is <code>2 * 3</code>.  That is, <code>2 * 3</code> is
@@ -97,6 +96,15 @@ other words, after executing the redex, the computation is <i>done</i>.
 </p>
 
 
+<div style="text-align: center;">
+
+<div id="orgb5821a2" class="figure">
+<p><img src="images/example-1.png" alt="example-1.png" />
+</p>
+</div>
+
+</div>
+
 <p>
 This silly example already shows a key property of continuations: they
 are comprised not solely of operational descriptions (<code>+</code>), but also
@@ -105,9 +113,9 @@ is applied (<code>1</code>).
 </p>
 </div>
 </div>
-<div id="outline-container-orgd4c1fdd" class="outline-3">
-<h3 id="orgd4c1fdd">Example 2: Subsequent statements</h3>
-<div class="outline-text-3" id="text-orgd4c1fdd">
+<div id="outline-container-org383a35d" class="outline-3">
+<h3 id="org383a35d">Example 2: Subsequent statements</h3>
+<div class="outline-text-3" id="text-org383a35d">
 <p>
 There is no reason to limit the abstraction level of "steps" just to
 arithmetic expressions.  We could take a step to be a statement.  The
@@ -121,28 +129,37 @@ Consider
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 1: </span>Example 2</label><pre class="src src-C++" id="orgf500274"><span class="linenr">1: </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = x * x;
+<label class="org-src-name"><span class="listing-number">Listing 1: </span>Example 2</label><pre class="src src-C++" id="org982f160"><span class="linenr">1: </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = x * x;
 <span class="linenr">2: </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqy</span> = y * y;
 <span class="linenr">3: </span><span class="org-keyword">auto</span> <span class="org-variable-name">r</span> = sqx + sqy;
 </pre>
 </div>
 
 <p>
-A valid execution state has the statement in line 1 as its redex and
-statements of lines 2 and 3 conform its continuation.
+A valid execution state has the statement in line 2 as its redex and
+statements of lines 3 as its continuation.
 </p>
 
+
+<div style="text-align: center;">
+
+<div id="org8114c15" class="figure">
+<p><img src="images/example-2.png" alt="example-2.png" />
+</p>
+</div>
+
+</div>
 
 <p>
-Disregarding practicality, it does not really matter how granular
-(abstract) a step is when discussing continuations as long as we are
-consistent.
+Disregarding practicality, it does not really matter how granular or
+abstract a step is taken to be when describing a computation, we can
+still categorize the parts of the execution state.
 </p>
 </div>
 </div>
-<div id="outline-container-orgc09882c" class="outline-3">
-<h3 id="orgc09882c">Example 3: Function boundaries</h3>
-<div class="outline-text-3" id="text-orgc09882c">
+<div id="outline-container-orgc022d5a" class="outline-3">
+<h3 id="orgc022d5a">Example 3: Function boundaries</h3>
+<div class="outline-text-3" id="text-orgc022d5a">
 <p>
 So far none of the examples have function calls in them, but this does
 not have to be the case.  Given the function <code>hypotenuse</code> as defined
@@ -150,7 +167,7 @@ below
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 2: </span>Example 3</label><pre class="src src-C++" id="org88905fc"><span class="linenr">1: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+<label class="org-src-name"><span class="listing-number">Listing 2: </span>Example 3</label><pre class="src src-C++" id="orgae377d2"><span class="linenr">1: </span><span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
 <span class="linenr">2: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = sq(x);
 <span class="linenr">3: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">sqy</span> = sq(y);
 <span class="linenr">4: </span>  <span class="org-keyword">auto</span> <span class="org-variable-name">r</span> = add(sqx, sqy);
@@ -159,55 +176,68 @@ below
 </pre>
 </div>
 <p>
-If <code>sq(x)</code> is the redex of an execution state, then its continuation
+If the execution state has <code>sq(x)</code> as its redex, then its continuation
 is conformed by the assignment to <code>sqx</code>, statements of lines 5, 6 and
 7, and whatever the caller of <code>hypotenuse</code> does after <code>hypotenuse</code>
-returns.  Notice that we treated <code>sq(x)</code> as a single step, ignoring
-the complexity of the implementation of <code>sq</code>.
+returns.
 </p>
 
 
 <p>
-The notion being stressed throughout these first three examples, is
-that of continuations being "whatever remains to be executed",
-regardless of the abstraction level at which we decide to operate in.
+Unlike the preceding examples, where steps where always of the same
+kind (arithmetic expressions and statements, respectively), here we
+have characterized the steps of a computation using a mixture of
+function call expressions, assignments, statements, and whatever the
+caller executes after returning from <code>hypotenuse</code>.  So not only can we
+take the steps that characterize a computation to be as coarse or fine
+grained as we want &#x2013; as shown by Example 2 &#x2013;, but we can also mix
+and match the granularity of the steps with which we describe a single
+computation.
 </p>
 
 
 <p>
-Before dealing with more interesting stuff, the final example displays
-some more key properties of continuations.
+Regardless of the abstraction level at which we decide to operate in,
+the continuations can always be thought of as "whatever remains to be
+executed", and the redex as "whatever is immediately executed".
+</p>
+
+
+<p>
+The next example shows some more revelant properties of continuations
+and programs.
 </p>
 </div>
 </div>
-<div id="outline-container-org607c2f2" class="outline-3">
-<h3 id="org607c2f2">Example 4: Conditional branches</h3>
-<div class="outline-text-3" id="text-org607c2f2">
+<div id="outline-container-orgf33f30f" class="outline-3">
+<h3 id="orgf33f30f">Example 4: Conditional branches</h3>
+<div class="outline-text-3" id="text-orgf33f30f">
 <p>
-<a id="org12447fd"></a>
+<a id="org9d961c7"></a>
 </p>
 
 <p>
-Consider the code listing below.  What is the continuation when line
-<code>1</code> is the redex?  Is it necessary to know the result of <code>rand() % 2</code>
-to determine the continuation?
+Consider the ternary expression <code>rand() % 2 ? foo() : bar()</code>.  What is
+the continuation when the redex is <code>rand() % 2</code>.  Is it necessary to
+know the result of <code>rand() % 2</code> to determine the continuation?
 </p>
 
-<div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 3: </span>Example 4</label><pre class="src src-C++" id="org6e485db"><span class="linenr">1: </span><span class="org-keyword">if</span> (rand() % 2) {
-<span class="linenr">2: </span>  <span class="org-keyword">return</span> foo();
-<span class="linenr">3: </span>} <span class="org-keyword">else</span> {
-<span class="linenr">4: </span>  <span class="org-keyword">return</span> bar();
-<span class="linenr">5: </span>}
-</pre>
+<div style="text-align: center;">
+
+<div id="org363fb85" class="figure">
+<p><img src="images/example-4.png" alt="example-4.png" />
+</p>
 </div>
+
+</div>
+
+
 <p>
 This is a tricky question.  There is no such thing as <i>the</i>
 continuation at this point in the execution, but rather two (!)
-continuations.  After evaluating the conditional, one continuation is
-<i>discarded</i> and the other one is applied.
+continuations (as depicted above).  After evaluating the conditional,
+one continuation is <i>discarded</i> and the other one is applied.
 </p>
-
 
 <p>
 This example, short as it is, illustrates three more properties of
@@ -217,6 +247,19 @@ discarded; and (3) a continuation may be applied or discarded based on
 runtime information.
 </p>
 </div>
+</div>
+</div>
+<div id="outline-container-org6679a0f" class="outline-2">
+<h2 id="org6679a0f">Next steps</h2>
+<div class="outline-text-2" id="text-org6679a0f">
+<p>
+In this post we have settled some basics of continutions and their
+properties via examples.  The continutaions we have dealt with,
+however, are not very interesting in the sense that we cannot <i>do</i>
+anything with them.  Throughout the next few posts we will explore
+continuation passing style, from which we will develop a basic form of
+<code>std::execution</code>.
+</p>
 </div>
 </div>
 <div id="footnotes">
