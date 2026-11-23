@@ -20,15 +20,15 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org0783e71">Computational basis &amp; compositional patterns</a>
+<li><a href="#org6a4452d">Computational basis &amp; compositional patterns</a>
 <ul>
 <li>
 <ul>
-<li><a href="#orge994b1b">Lifting</a></li>
-<li><a href="#org64aad57">Sequencing</a></li>
-<li><a href="#org2d2fe6a">Mapping</a></li>
-<li><a href="#org0bafb5d">What about main? Revisited</a></li>
-<li><a href="#orgb229261">Computational basis for computation</a></li>
+<li><a href="#org82c4637">Lifting</a></li>
+<li><a href="#org499e01d">Sequencing</a></li>
+<li><a href="#org0a38d4a">Mapping</a></li>
+<li><a href="#org114f5fc">What about main? Revisited</a></li>
+<li><a href="#org0a4bdd7">Computational basis for computation</a></li>
 </ul>
 </li>
 </ul>
@@ -36,9 +36,9 @@
 </ul>
 </div>
 </div>
-<div id="outline-container-org0783e71" class="outline-2">
-<h2 id="org0783e71">Computational basis &amp; compositional patterns</h2>
-<div class="outline-text-2" id="text-org0783e71">
+<div id="outline-container-org6a4452d" class="outline-2">
+<h2 id="org6a4452d">Computational basis &amp; compositional patterns</h2>
+<div class="outline-text-2" id="text-org6a4452d">
 <p>
 In Elements of Programming, a <b>computational basis for a type</b> is
 defined as the finite set of procedures that enable the construction
@@ -72,9 +72,9 @@ running example, making it more maintainable and aesthetically
 pleasing.
 </p>
 </div>
-<div id="outline-container-orge994b1b" class="outline-4">
-<h4 id="orge994b1b">Lifting</h4>
-<div class="outline-text-4" id="text-orge994b1b">
+<div id="outline-container-org82c4637" class="outline-4">
+<h4 id="org82c4637">Lifting</h4>
+<div class="outline-text-4" id="text-org82c4637">
 <p>
 Lifting in the context of CPS occurs whenever we want to carry some
 data from the direct style world to the CPS world. In Listing
@@ -85,7 +85,7 @@ the listing below.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 1: </span>Lifting with <code>just</code></label><pre class="src src-C++" id="org30f7afb"><span class="org-keyword">auto</span> <span class="org-function-name">just</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">value</span>) {
+<label class="org-src-name"><span class="listing-number">Listing 1: </span>Lifting with <code>just</code></label><pre class="src src-C++" id="org5443fc6"><span class="org-keyword">auto</span> <span class="org-function-name">just</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">value</span>) {
   <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
     <span class="org-keyword">return</span> [=]() {
       <span class="org-keyword">return</span> cc(value);
@@ -103,9 +103,9 @@ user-provided callback.
 </p>
 </div>
 </div>
-<div id="outline-container-org64aad57" class="outline-4">
-<h4 id="org64aad57">Sequencing</h4>
-<div class="outline-text-4" id="text-org64aad57">
+<div id="outline-container-org499e01d" class="outline-4">
+<h4 id="org499e01d">Sequencing</h4>
+<div class="outline-text-4" id="text-org499e01d">
 <p>
 A basic compositional pattern between computations is using the
 outputs of one computation as the inputs of the next computation.  The
@@ -113,7 +113,7 @@ function in Listing (tbd-link)let value, <code>let_value</code>, captures this p
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 2: </span>Sequencing with <code>let_value</code></label><pre class="src src-C++" id="orgb087a84"><span class="org-keyword">auto</span> <span class="org-function-name">let_value</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">g_nonconfig</span>) {
+<label class="org-src-name"><span class="listing-number">Listing 2: </span>Sequencing with <code>let_value</code></label><pre class="src src-C++" id="orgae85815"><span class="org-keyword">auto</span> <span class="org-function-name">let_value</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">g_nonconfig</span>) {
   <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
     <span class="org-keyword">return</span> [=]() {
       <span class="org-keyword">auto</span> <span class="org-variable-name">f_connected</span> = f_disconnected([=](<span class="org-keyword">auto</span> <span class="org-variable-name">f_ret</span>) {
@@ -148,12 +148,12 @@ thunk is immediately invoked.
 <p>
 With <code>let_value</code> and <code>just</code> at hand, we can already improve the
 readability of the running example quite a bit. Listing
-<a href="#orge739fcf">3</a> shows the refactor of <code>sq</code>.
+<a href="#org2daa0bb">3</a> shows the refactor of <code>sq</code>.
 </p>
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 3: </span>Refactor of <code>sq</code> with <code>let_value</code> and <code>just</code></label><pre class="src src-C++" id="orge739fcf"><span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS
+<label class="org-src-name"><span class="listing-number">Listing 3: </span>Refactor of <code>sq</code> with <code>let_value</code> and <code>just</code></label><pre class="src src-C++" id="org2daa0bb"><span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS
 </span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(x * x); }; }; }
 
 <span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS with let_value and just
@@ -177,11 +177,11 @@ refactored, after developing the <code>then</code> algorithm.
 </p>
 </div>
 </div>
-<div id="outline-container-org2d2fe6a" class="outline-4">
-<h4 id="org2d2fe6a">Mapping</h4>
-<div class="outline-text-4" id="text-org2d2fe6a">
+<div id="outline-container-org0a38d4a" class="outline-4">
+<h4 id="org0a38d4a">Mapping</h4>
+<div class="outline-text-4" id="text-org0a38d4a">
 <p>
-The compositional pattern between <code>sq</code> and <code>mul_</code> in the <a href="#orge739fcf">previous
+The compositional pattern between <code>sq</code> and <code>mul_</code> in the <a href="#org2daa0bb">previous
 section</a> is common to <code>sq</code>, <code>add</code>, and <code>sqr</code>.  It is captured by the
 <code>then</code> algorithm.  This algorithm can be seen as a lifting from direct
 style to CPS, like <code>just</code>, but for mapping functions (functions
@@ -191,7 +191,7 @@ before forwarding the mapped value as input of the next computation.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 4: </span>Mapping with <code>then</code></label><pre class="src src-C++" id="orgfdc515a"><span class="org-keyword">auto</span> <span class="org-function-name">then</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">map</span>) {
+<label class="org-src-name"><span class="listing-number">Listing 4: </span>Mapping with <code>then</code></label><pre class="src src-C++" id="org0e55311"><span class="org-keyword">auto</span> <span class="org-function-name">then</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">map</span>) {
   <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
     <span class="org-keyword">return</span> [=]() {
       <span class="org-keyword">return</span> f_disconnected([](<span class="org-keyword">auto</span> <span class="org-variable-name">x</span>) {
@@ -205,11 +205,11 @@ before forwarding the mapped value as input of the next computation.
 
 <p>
 The running example, after applying these compositional patterns, is
-shown in Listing <a href="#orgccb2d87">5</a>.
+shown in Listing <a href="#org30f4eda">5</a>.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 5: </span>Hypotenuse function written with CPS compositional patterns</label><pre class="src src-C++" id="orgccb2d87"><span class="org-comment-delimiter">// </span><span class="org-comment">mul_, add_, sqrt_ are the usual arithmetic operations.
+<label class="org-src-name"><span class="listing-number">Listing 5: </span>Hypotenuse function written with CPS compositional patterns</label><pre class="src src-C++" id="org30f4eda"><span class="org-comment-delimiter">// </span><span class="org-comment">mul_, add_, sqrt_ are the usual arithmetic operations.
 </span><span class="org-comment-delimiter">// </span><span class="org-comment">binary operations taking a pair instead of two args
 </span>
 <span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> then(just(make_pair(x, x)), mul_); }
@@ -228,21 +228,21 @@ shown in Listing <a href="#orgccb2d87">5</a>.
 </div>
 </div>
 </div>
-<div id="outline-container-org0bafb5d" class="outline-4">
-<h4 id="org0bafb5d">What about main? Revisited</h4>
-<div class="outline-text-4" id="text-org0bafb5d">
+<div id="outline-container-org114f5fc" class="outline-4">
+<h4 id="org114f5fc">What about main? Revisited</h4>
+<div class="outline-text-4" id="text-org114f5fc">
 <p>
 We have (tbd-link what about main) already discussed <code>main</code> being a bridge between direct style
 and CPS.  The compositional pattern that achieves this "bridging" is
 <code>sync_wait</code>.  Its implementation simply triggers the thunk of the
 previous computation after attaching a callback that "leaks" the
 result of the previous computation into the direct style world (see
-Listing <a href="#org62f0117">6</a>).
+Listing <a href="#orge4774bb">6</a>).
 </p>
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 6: </span>Back to direct style with <code>sync_wait</code></label><pre class="src src-C++" id="org62f0117"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Ret</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 6: </span>Back to direct style with <code>sync_wait</code></label><pre class="src src-C++" id="orge4774bb"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Ret</span>&gt;
 <span class="org-type">Ret</span> <span class="org-function-name">sync_wait</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">f_disconnected</span>) {
   <span class="org-constant">std</span>::<span class="org-type">optional</span>&lt;<span class="org-type">Ret</span>&gt; <span class="org-variable-name">value</span>;
   <span class="org-keyword">auto</span> <span class="org-variable-name">thunk</span> = f_disconnected([&amp;](<span class="org-type">Ret</span> <span class="org-variable-name">x</span>) { value.emplace(x); });
@@ -263,7 +263,7 @@ no way for it to deduce it automatically.
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 7: </span><code>main</code> with <code>sync_wait</code></label><pre class="src src-C++" id="org3973554"><span class="org-type">void</span> <span class="org-function-name">main</span>() {
+<label class="org-src-name"><span class="listing-number">Listing 7: </span><code>main</code> with <code>sync_wait</code></label><pre class="src src-C++" id="orgf170436"><span class="org-type">void</span> <span class="org-function-name">main</span>() {
   <span class="org-keyword">auto</span> <span class="org-variable-name">result</span> = sync_wait&lt;<span class="org-type">double</span>&gt;(hypotenuse(2.0, 3.0));
   <span class="org-constant">std</span>::println(<span class="org-string">"{}"</span>, result);
 }
@@ -271,9 +271,9 @@ no way for it to deduce it automatically.
 </div>
 </div>
 </div>
-<div id="outline-container-orgb229261" class="outline-4">
-<h4 id="orgb229261">Computational basis for computation</h4>
-<div class="outline-text-4" id="text-orgb229261">
+<div id="outline-container-org0a4bdd7" class="outline-4">
+<h4 id="org0a4bdd7">Computational basis for computation</h4>
+<div class="outline-text-4" id="text-org0a4bdd7">
 <p>
 The compositional patterns developed so far: <code>just</code>, <code>let_value</code>,
 <code>then</code>, and <code>sync_wait</code> are almost enough to express all the ways in

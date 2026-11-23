@@ -20,20 +20,20 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org1834480">Simplified <code>std::execution</code></a>
+<li><a href="#org5411f04">Simplified <code>std::execution</code></a>
 <ul>
-<li><a href="#orgef6a94c">Simplified <code>just</code></a></li>
-<li><a href="#org2d50e75">Simplified <code>then</code></a></li>
-<li><a href="#orga6523ab">Simplified <code>let_value</code></a></li>
-<li><a href="#org37ed107">What about <code>main</code>? Re-revisited</a></li>
+<li><a href="#org72590ad">Simplified <code>just</code></a></li>
+<li><a href="#orgc344463">Simplified <code>then</code></a></li>
+<li><a href="#org52e2c20">Simplified <code>let_value</code></a></li>
+<li><a href="#org7f84f7b">What about <code>main</code>? Re-revisited</a></li>
 </ul>
 </li>
 </ul>
 </div>
 </div>
-<div id="outline-container-org1834480" class="outline-2">
-<h2 id="org1834480">Simplified <code>std::execution</code></h2>
-<div class="outline-text-2" id="text-org1834480">
+<div id="outline-container-org5411f04" class="outline-2">
+<h2 id="org5411f04">Simplified <code>std::execution</code></h2>
+<div class="outline-text-2" id="text-org5411f04">
 <p>
 Compositional patterns over lazy curried CPS, as developed over the
 last sections, are analogous in many ways to the control flow
@@ -70,9 +70,9 @@ a structure more alike that of <code>std::execution</code>'s sender algorithms,
 while we explain some of <code>std::execution</code> core terminology.
 </p>
 </div>
-<div id="outline-container-orgef6a94c" class="outline-3">
-<h3 id="orgef6a94c">Simplified <code>just</code></h3>
-<div class="outline-text-3" id="text-orgef6a94c">
+<div id="outline-container-org72590ad" class="outline-3">
+<h3 id="org72590ad">Simplified <code>just</code></h3>
+<div class="outline-text-3" id="text-org72590ad">
 <p>
 The most basic sender algorithm is <code>just</code>.  The API for invoking
 <code>just</code> is about the same as that of Listing (tbd-link)just &#x2013; main
@@ -88,7 +88,7 @@ its data argument somehow, leading us to the following code.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 1: </span><code>just</code> sender factory (0 of 2)</label><pre class="src src-C++" id="orgf84903e"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 1: </span><code>just</code> sender factory (0 of 2)</label><pre class="src src-C++" id="orgc2f5e37"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
 <span class="org-keyword">struct</span> <span class="org-constant">just_</span>::<span class="org-type">snd</span>;
 
 <span class="org-keyword">static</span> <span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> <span class="org-variable-name">just</span> = [](<span class="org-keyword">auto</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> <span class="org-constant">just_</span>::snd(x); };
@@ -117,7 +117,7 @@ data, so it is constructed from them.</li>
 </ol>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 2: </span><code>just</code> sender factory (1 of 2)</label><pre class="src src-C++" id="org01594b6"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 2: </span><code>just</code> sender factory (1 of 2)</label><pre class="src src-C++" id="org9d263a5"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
 <span class="org-keyword">struct</span> <span class="org-constant">just_</span>::<span class="org-type">op</span>;
 
 <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
@@ -138,7 +138,7 @@ completion channel: <code>set_value</code>.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 3: </span><code>just</code> sender factory (2 of 2)</label><pre class="src src-C++" id="org00d7b04"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 3: </span><code>just</code> sender factory (2 of 2)</label><pre class="src src-C++" id="org739038a"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">T</span>&gt;
 <span class="org-keyword">struct</span> <span class="org-constant">just_</span>::<span class="org-type">op</span> {
   <span class="org-type">Rcv</span> <span class="org-variable-name">next</span>;
   <span class="org-type">T</span> <span class="org-variable-name">x</span>;
@@ -154,9 +154,9 @@ This concludes the implementation of <code>just</code> in the simplified
 </p>
 </div>
 </div>
-<div id="outline-container-org2d50e75" class="outline-3">
-<h3 id="org2d50e75">Simplified <code>then</code></h3>
-<div class="outline-text-3" id="text-org2d50e75">
+<div id="outline-container-orgc344463" class="outline-3">
+<h3 id="orgc344463">Simplified <code>then</code></h3>
+<div class="outline-text-3" id="text-orgc344463">
 <p>
 The <code>then</code> algorithm is what <code>std::execution</code> categorizes as a <b>sender
 adaptor</b>.  The parameter list of sender adaptors consists of both
@@ -177,7 +177,7 @@ sender that makes use of the input sender and input invocable.
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 4: </span><code>then</code> sender adaptor (0 of 3)</label><pre class="src src-C++" id="org653e92a"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Prev</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 4: </span><code>then</code> sender adaptor (0 of 3)</label><pre class="src src-C++" id="orgadd9655"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Prev</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
 <span class="org-keyword">struct</span> <span class="org-constant">then_</span>::<span class="org-type">snd</span>;
 
 <span class="org-keyword">static</span> <span class="org-keyword">constexpr</span> <span class="org-keyword">auto</span> <span class="org-variable-name">then</span> = [](<span class="org-keyword">auto</span> <span class="org-variable-name">prev</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">f</span>) {
@@ -215,7 +215,7 @@ data, and the child sender, so it is constructed from them.</li>
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 5: </span><code>then</code> sender adaptor (1 of 3)</label><pre class="src src-C++" id="org62a57d7"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">Prev</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 5: </span><code>then</code> sender adaptor (1 of 3)</label><pre class="src src-C++" id="org2db5d64"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">Prev</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
 <span class="org-keyword">struct</span> <span class="org-constant">then_</span>::<span class="org-type">op</span>;
 
 <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Prev</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
@@ -239,7 +239,7 @@ immedately invoked.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 6: </span><code>then</code> sender adaptor (2 of 3)</label><pre class="src src-C++" id="orgd454a2c"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Op</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 6: </span><code>then</code> sender adaptor (2 of 3)</label><pre class="src src-C++" id="org5a79c35"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Op</span>&gt;
 <span class="org-keyword">struct</span> <span class="org-constant">then_</span>::<span class="org-type">rcv</span>;
 
 <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Rcv</span>, <span class="org-keyword">typename</span> <span class="org-type">Prev</span>, <span class="org-keyword">typename</span> <span class="org-type">F</span>&gt;
@@ -277,7 +277,7 @@ is depicted in Listing (tbd-link then)thenender-adaptor-step-3]].
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 7: </span><code>then</code> sender adaptor (3 of 3)</label><pre class="src src-C++" id="orgd3609fb"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Op</span>&gt;
+<label class="org-src-name"><span class="listing-number">Listing 7: </span><code>then</code> sender adaptor (3 of 3)</label><pre class="src src-C++" id="org50058f1"><span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Op</span>&gt;
 <span class="org-keyword">struct</span> <span class="org-constant">then_</span>::<span class="org-type">rcv</span> {
   <span class="org-type">Op</span>* <span class="org-variable-name">op</span>;
   <span class="org-type">void</span> <span class="org-function-name">set_value</span>(<span class="org-keyword">auto</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> op-&gt;complete(x); }
@@ -291,9 +291,9 @@ is depicted in Listing (tbd-link then)thenender-adaptor-step-3]].
 </div>
 </div>
 </div>
-<div id="outline-container-orga6523ab" class="outline-3">
-<h3 id="orga6523ab">Simplified <code>let_value</code></h3>
-<div class="outline-text-3" id="text-orga6523ab">
+<div id="outline-container-org52e2c20" class="outline-3">
+<h3 id="org52e2c20">Simplified <code>let_value</code></h3>
+<div class="outline-text-3" id="text-org52e2c20">
 <div class="org-src-container">
 <pre class="src src-C++"><span class="org-keyword">namespace</span> <span class="org-constant">let_value_</span> {
   <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Op</span>&gt;
@@ -336,9 +336,9 @@ is depicted in Listing (tbd-link then)thenender-adaptor-step-3]].
 </div>
 </div>
 </div>
-<div id="outline-container-org37ed107" class="outline-3">
-<h3 id="org37ed107">What about <code>main</code>? Re-revisited</h3>
-<div class="outline-text-3" id="text-org37ed107">
+<div id="outline-container-org7f84f7b" class="outline-3">
+<h3 id="org7f84f7b">What about <code>main</code>? Re-revisited</h3>
+<div class="outline-text-3" id="text-org7f84f7b">
 <div class="org-src-container">
 <pre class="src src-C++"><span class="org-keyword">namespace</span> <span class="org-constant">sync_wait_</span> {
   <span class="org-keyword">template</span>&lt;<span class="org-keyword">typename</span> <span class="org-type">Ret</span>&gt;
