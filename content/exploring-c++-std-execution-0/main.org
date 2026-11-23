@@ -9,18 +9,19 @@ from first principles -- or at least my understanding of it.
 
 * Computation and continuations
 
-We begin with the bare basics: continuations in their most simple
-form.
+We begin with the bare basics of the concepts behind =std::execution=:
+computations and continuations.
+
 
 A *computation* can be intuitively understood as a process by which
-some inputs are converted into some outputs by executing a set of
-steps one after the other[fn:computation-model].  At any given time, the
-*execution state* of a computation is composed of two kinds of steps:
-already executed steps and to-be-executed steps.  To-be-executed steps
-can be further subdivided into the next immediate step to be executed,
-and the remaining non-immediate steps to be executed.  The former step
-is known as the *reducible expression* (redex for short) and the
-latter steps conform what is referred to as the *continuation*.
+some inputs are converted into some outputs by executing a sequence of
+steps in order[fn:computation-model].  At any given time, the *execution
+state* of a computation is composed of two kinds of steps: those that
+have already been executed and those to be executed.  The steps to be
+executed can be further subdivided into the next immediate step to be
+executed and the remaining (non-immediate) steps to be executed.  The
+former step is known as the *reducible expression* (or redex) and the
+latter steps conform the *continuation*.
 
 
 #+BEGIN_EXPORT html
@@ -55,18 +56,6 @@ that the first step to be executed is =2 * 3=.  That is, =2 * 3= is
 the redex and =1 + ...= is the continuation.
 
 
-While =2 * 3= is executed, the result of =1 + ...= remains
-undetermined.  We can think of =1 + ...= as being /suspended/ until
-the result of =2 * 3= is available.  Once the result is available, we
-substitute the ellipsis in =1 + ...= to obtain =1 + 6=.  This
-substitution process is denoted as /applying the continuation/.
-
-
-The expression we are left with, =1 + 6=, has one single step to be
-executed and an empty continuation (no non-immediate next steps).  In
-other words, after executing the redex, the computation is /done/.
-
-
 #+BEGIN_EXPORT html
 <div style="text-align: center;">
 #+END_EXPORT
@@ -81,9 +70,9 @@ other words, after executing the redex, the computation is /done/.
 
     executed [label=<Executed steps:<BR/>none>];
 
-    todo [label=<To-be-executed steps:<BR/>1 + 2 * ...>];
+    todo [label=<To-be-executed steps:<BR/>1 + 2 * 3>];
 
-    redex [label=<Redex:<BR/>2 * ...>];
+    redex [label=<Redex:<BR/>2 * 3>];
 
     continuation [label=<Continuation:<BR/>1 + ...>];
 
@@ -96,6 +85,50 @@ other words, after executing the redex, the computation is /done/.
 #+BEGIN_EXPORT html
 </div>
 #+END_EXPORT
+
+
+While =2 * 3= is executed, the result of =1 + ...= remains
+undetermined.  We can think of =1 + ...= as being /suspended/ until
+the result of =2 * 3= is available.
+
+
+Once the result is available, we substitute the ellipsis in =1 + ...=
+with it.  This substitution process is commonly known as /applying the
+continuation/.  At this point there is one single step to be executed
+and an empty continuation (no non-immediate next steps).  In other
+words, after executing the redex, the computation is /done/ (see
+[[figure:example-1-1][Figure below]], where the resolved =2 * 3= in the redex is signaled with
+a different font color).
+
+#+BEGIN_EXPORT html
+<div style="text-align: center;">
+#+END_EXPORT
+#+NAME: figure:example-1-1
+#+CAPTION: Continuation and redex in Example 1, after one execution step
+#+BEGIN_SRC dot :file images/example-1-1.png :cmdline -Kdot -Tpng :exports results
+  digraph G {
+    node [shape=box];  
+
+    state [label=<Execution state of<BR/>1 + 2 * 3>];
+
+    executed [label=<Executed steps:<BR/>2 * 3>];
+
+    todo [label=<To-be-executed steps:<BR/>1 + ...>];
+
+    redex [label=<Redex:<BR/>1 + <FONT COLOR="forestgreen">(2 * 3)</FONT>>];
+
+    continuation [label=<Continuation:<BR/>none>];
+
+    state -> executed;
+    state -> todo;
+    todo -> redex;
+    todo -> continuation;
+  }
+#+END_SRC
+#+BEGIN_EXPORT html
+</div>
+#+END_EXPORT
+
 
 This silly example already shows a key property of continuations: they
 are comprised not solely of operational descriptions (=+=), but also
@@ -179,15 +212,15 @@ is conformed by the assignment to =sqx=, statements of lines 5, 6 and
 returns.
 
 
-Unlike the preceding examples, where steps where always of the same
-kind (arithmetic expressions and statements, respectively), here we
-have characterized the steps of a computation using a mixture of
-function call expressions, assignments, statements, and whatever the
-caller executes after returning from =hypotenuse=.  So not only can we
-take the steps that characterize a computation to be as coarse or fine
-grained as we want -- as shown by Example 2 --, but we can also mix
-and match the granularity of the steps with which we describe a single
-computation.
+Unlike the preceding examples where steps were always at the same
+abstraction level (either all steps were arithmetic expressions or
+statements), here we have characterized the steps of a computation
+using a mixture of function call expressions, assignments, statements,
+and whatever the caller executes after returning from =hypotenuse=.
+So not only can we take the steps that characterize a computation to
+be as coarse or fine grained as we want -- as shown by Example 2 --,
+but we can also mix and match abstraction levels when describing a
+single computation.
 
 
 Regardless of the abstraction level at which we decide to operate in,
@@ -222,9 +255,9 @@ know the result of =rand() % 2= to determine the continuation?
 
     redex [label=<Redex:<BR/>rand() % 2>];
 
-    continuation1 [label=<Continuation case true:<BR/>foo()>];
+    continuation1 [label=<Continuation "case true":<BR/>foo()>];
 
-    continuation2 [label=<Continuation case false:<BR/>bar()>];    
+    continuation2 [label=<Continuation "case false":<BR/>bar()>];    
 
     state -> executed;
     state -> todo;
@@ -245,7 +278,7 @@ one continuation is /discarded/ and the other one is applied.
 
 This example, short as it is, illustrates three more properties of
 continuations: (1) there is not necessarily one continuation at any
-given time; (2) continuations do not have to be applied, they can be
+given time; (2) continuations do not /have to/ be applied, they can be
 discarded; and (3) a continuation may be applied or discarded based on
 runtime information.
 
