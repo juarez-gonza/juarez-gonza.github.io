@@ -21,19 +21,19 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org1f9a3cd">Currying the callback arguments</a>
+<li><a href="#org4a6acef">Currying the callback arguments</a>
 <ul>
-<li><a href="#org0dd9c72">Laziness and thunks</a></li>
+<li><a href="#orgfe4fcaa">Laziness and thunks</a></li>
 </ul>
 </li>
 </ul>
 </div>
 </div>
-<div id="outline-container-org1f9a3cd" class="outline-2">
-<h2 id="org1f9a3cd">Currying the callback arguments</h2>
-<div class="outline-text-2" id="text-org1f9a3cd">
+<div id="outline-container-org4a6acef" class="outline-2">
+<h2 id="org4a6acef">Currying the callback arguments</h2>
+<div class="outline-text-2" id="text-org4a6acef">
 <p>
-<a id="org8c45c1e"></a>
+<a id="orga2f0181"></a>
 </p>
 
 <p>
@@ -52,7 +52,7 @@ transformed as <b>Curried CPS function (CCPS function)</b>.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 1: </span>CPS to CCPS: Callee</label><pre class="src src-C++" id="org11e9047"><span class="org-comment-delimiter">// </span><span class="org-comment">CPS
+<label class="org-src-name"><span class="listing-number">Listing 1: </span>CPS to CCPS: Callee</label><pre class="src src-C++" id="org3f5871b"><span class="org-comment-delimiter">// </span><span class="org-comment">CPS
 </span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }
 
 <span class="org-comment-delimiter">// </span><span class="org-comment">CCPS
@@ -70,13 +70,13 @@ dangle as soon as the curried CPS function returns.
 
 
 <p>
-On the other hand, the call-site (Listing <a href="#org4eadc1f">2</a>)
+On the other hand, the call-site (Listing <a href="#org56c5c4a">2</a>)
 can invoke the CCPS with a callback that captures by reference because
 the callback is invoked before the call expression is fully evaluated.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 2: </span>CPS to CCPS: Caller</label><pre class="src src-C++" id="org4eadc1f"><span class="org-comment-delimiter">// </span><span class="org-comment">CPS
+<label class="org-src-name"><span class="listing-number">Listing 2: </span>CPS to CCPS: Caller</label><pre class="src src-C++" id="org56c5c4a"><span class="org-comment-delimiter">// </span><span class="org-comment">CPS
 </span><span class="org-keyword">return</span> sq(x, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> foo(sqx); });
 
 <span class="org-comment-delimiter">// </span><span class="org-comment">CCPS
@@ -91,7 +91,7 @@ Applying this transformation to the <code>hypotenuse</code> example of Listing
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 3: </span>Hypotenuse function written in curried CPS</label><pre class="src src-C++" id="orga3d7950"><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }; }
+<label class="org-src-name"><span class="listing-number">Listing 3: </span>Hypotenuse function written in curried CPS</label><pre class="src src-C++" id="orgccfb0d7"><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }; }
 <span class="org-keyword">auto</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x + y); }; }
 <span class="org-keyword">auto</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(sqrt(x)); }; }
 <span class="org-keyword">auto</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
@@ -150,7 +150,7 @@ is resolved, one of the callbacks is applied to its result.</li>
 
 <div style="text-align: center;">
 
-<div id="org2ca45db" class="figure">
+<div id="org3c2899f" class="figure">
 <p><img src="images/curried-cps.png" alt="curried-cps.png" />
 </p>
 </div>
@@ -164,11 +164,11 @@ redex and which are callbacks.  Now this is always known from the
 structure of the curried CPS functions.
 </p>
 </div>
-<div id="outline-container-org0dd9c72" class="outline-3">
-<h3 id="org0dd9c72">Laziness and thunks</h3>
-<div class="outline-text-3" id="text-org0dd9c72">
+<div id="outline-container-orgfe4fcaa" class="outline-3">
+<h3 id="orgfe4fcaa">Laziness and thunks</h3>
+<div class="outline-text-3" id="text-orgfe4fcaa">
 <p>
-<a id="org79ac43e"></a>
+<a id="org21b4319"></a>
 </p>
 
 <p>
@@ -201,7 +201,7 @@ applied to curried CPS functions is depicted in the listings below.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 4: </span>Curried CPS to lazy curried CPS: Callee</label><pre class="src src-C++" id="org1c4bbcc"><span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
+<label class="org-src-name"><span class="listing-number">Listing 4: </span>Curried CPS to lazy curried CPS: Callee</label><pre class="src src-C++" id="org3df2234"><span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
 </span><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }; }
 
 <span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS
@@ -211,7 +211,7 @@ applied to curried CPS functions is depicted in the listings below.
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 5: </span>Curried CPS to lazy curried CPS: Caller</label><pre class="src src-C++" id="org4bde08a"><span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
+<label class="org-src-name"><span class="listing-number">Listing 5: </span>Curried CPS to lazy curried CPS: Caller</label><pre class="src src-C++" id="orgfca2e2d"><span class="org-comment-delimiter">// </span><span class="org-comment">Curried CPS
 </span><span class="org-keyword">return</span> sq(x)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> foo(sqx); });
 
 <span class="org-comment-delimiter">// </span><span class="org-comment">Lazy curried CPS
@@ -221,18 +221,18 @@ applied to curried CPS functions is depicted in the listings below.
 
 
 <p>
-Just like the curried callback parameter in the <a href="#org11e9047">previous section</a>, the
+Just like the curried callback parameter in the <a href="#org3f5871b">previous section</a>, the
 thunk must capture by value.  This is to prevent dangling of both
 redex data and callback arguments.  Call-site rules change, however.
 Before thunks callbacks created at call-site could capture by
 reference safely.  Now only the caller that invokes the thunk can do
 so.  The problematic case is depicted in Listing
-<a href="#org60581a4">6</a>.
+<a href="#org925bb22">6</a>.
 </p>
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 6: </span>Lazy curried CPS dangling at call-site</label><pre class="src src-C++" id="org60581a4"><span class="org-comment-delimiter">/* </span><span class="org-comment">thunk_type</span><span class="org-comment-delimiter"> */</span> <span class="org-keyword">auto</span> <span class="org-function-name">sq_plus</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
+<label class="org-src-name"><span class="listing-number">Listing 6: </span>Lazy curried CPS dangling at call-site</label><pre class="src src-C++" id="org925bb22"><span class="org-comment-delimiter">/* </span><span class="org-comment">thunk_type</span><span class="org-comment-delimiter"> */</span> <span class="org-keyword">auto</span> <span class="org-function-name">sq_plus</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
   <span class="org-keyword">return</span> sq(x)([&amp;](<span class="org-type">double</span> <span class="org-variable-name">sqx</span>) { <span class="org-keyword">return</span> sqx + y; });
 } <span class="org-comment-delimiter">// </span><span class="org-comment">ERROR! The callback has not been invoked yet, `y` has been destructed</span>
 </pre>
@@ -244,11 +244,11 @@ In code that executes a sequence of lazy curried CPS functions, thunks
 require an invocation after each callback attachment.  This leads to a
 sort of <i>chain reaction</i> through the sequenced operations: the
 completion of one operation immediately starts the next one, as shown
-in Listing <a href="#org5ef97fe">7</a>.
+in Listing <a href="#orgcae83ed">7</a>.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 7: </span>Hypotenuse function written in lazy curried CPS</label><pre class="src src-C++" id="org5ef97fe"><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(x * x); }; }; }
+<label class="org-src-name"><span class="listing-number">Listing 7: </span>Hypotenuse function written in lazy curried CPS</label><pre class="src src-C++" id="orgcae83ed"><span class="org-keyword">auto</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(x * x); }; }; }
 <span class="org-keyword">auto</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(x + y); }; }; }
 <span class="org-keyword">auto</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> [=](<span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> [=]() { <span class="org-keyword">return</span> cc(sqrt(x)); }; }; }
 <span class="org-keyword">auto</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
@@ -313,7 +313,7 @@ to its result.</li>
 
 <div style="text-align: center;">
 
-<div id="org513e09a" class="figure">
+<div id="org9e736a6" class="figure">
 <p><img src="images/lazy-curried-cps.png" alt="lazy-curried-cps.png" />
 </p>
 </div>
@@ -325,7 +325,7 @@ to its result.</li>
 At this point the simplified framework has almost everything it needs,
 functionally at least.  We still need to deal with its ugliness, as it
 would be very naive to expect code like that of Listing
-<a href="#org5ef97fe">7</a> to be maintainable or even
+<a href="#orgcae83ed">7</a> to be maintainable or even
 pleasant to read.
 </p>
 </div>
