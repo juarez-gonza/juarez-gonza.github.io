@@ -1,16 +1,12 @@
 #+title: Exploring C++ =std::execution= 1
 #+author: Gonzalo Juarez
 
+Continuations in the examples of [[file:~/u/juarez-gonza.github.io/content/exploring-c++-std-execution-0/main.org][the previous entry of this series]] are
+not very interesting.  They were useful back then to discuss the
+basics of continuations, but we cannot really /do/ anything
+interesting with them at this point.
+
 * Continuation Passing Style
-
-
-Continuations as shown in the examples of [[file:~/u/juarez-gonza.github.io/content/exploring-c++-std-execution-0/main.org][the previous entry of this
-series]] are not very interesting.  They are useful to discuss the
-basics of continuations, but so far we cannot really /do/ anything
-with them.
-
-
-** Continuations represented by objects
 
 More concretely, C++ has no language construct that allows us to treat
 continuations as any other kind of object in the language (some
@@ -27,18 +23,17 @@ turns code in /direct-style/ (the usual code, without continuations as
 objects) into CPS is the *CPS transform*, which roughly corresponds to
 the following algorithm:
 
-1. Choose some expression in the program and consider an execution
-   state where this expression is the redex.
-2. <<cps-transform:step-3>>Replace the redex in the original code by a
-   *CPS function* (see Listing [[listing:cps-transform-step-3]]). This
-   function:
-   1. Takes the parameters needed to execute the redex, referred to as
-      *redex data*.
-   2. Takes one extra invocable parameter per continuation, together
-      referred to as *callbacks*.
+1. Choose some expression =expr= in the program and consider an
+   execution state where =expr= is the redex.
+2. <<cps-transform:step-3>>From =expr=, write a *CPS function* (see
+   Listing [[listing:cps-transform-step-3]]).  This is a function that:
+   1. Parameterizes[fn:parameterize] the data on which =expr= depends,
+      referred to as *redex data*.
+   2. Takes one extra invocable parameter per continuation associated
+      to =expr= in the original code, together referred to as
+      *callbacks*.
    3. Applies /only one/ of the callbacks to the result of the
-      evaluation of the original redex (making use of redex data).
-
+      evaluation =expr=.
 
 #+NAME: listing:cps-transform-step-3
 #+CAPTION: Direct style to Continuation Passing Style: Callee
@@ -51,13 +46,14 @@ the following algorithm:
 #+END_SRC
 
 
-3. [@3] Invoke the CPS function with the arguments that allow the execution
-   of the redex and one lambda per callback argument. Each lambda is
-   associated to one of the continuations in the original code.  If
-   the associated continuation is empty, then the body of the lambda
-   just returns its argument (i.e., it is the identity function).  Otherwise, the body of the lambda
-   corresponds to the steps of the associated continuation (see
-   Listing [[listing:cps-transform-step-4]]).
+3. [@3] Applies the CPS function to the data of =expr= that was
+   parameterized by the CPS function, and to one lambda per callback
+   parameter of the CPS function. Each lambda is associated to one of
+   the continuations in the original code.  If the associated
+   continuation is empty, then the body of the lambda just returns its
+   argument (i.e. it is the identity function).  Otherwise, the body
+   of the lambda corresponds to the steps of the associated
+   continuation (see Listing [[listing:cps-transform-step-4]]).
 
 
 #+NAME: listing:cps-transform-step-4
@@ -73,8 +69,8 @@ the following algorithm:
 
 
 4. [@4] <<cps-transform:step-4>> For each non-identity lambda created
-   in step 4, repeat from step 2 using as redex the first statement of
-   the lambda.
+   in step 4, repeat from step 2 using as =expr= the first statement
+   of the lambda.
 
 To illustrate the iterative nature of the CPS transform ([[cps-transform:step-4][step 4]]),
 consider the following example:
@@ -93,7 +89,7 @@ double hypotenuse(double x, double y) {
 }
 #+END_SRC
 
-The CPS transform yields
+A few iterations of the CPS transform yield
 
 #+NAME: listing:cps-hypotenuse
 #+CAPTION: Hypotenuse function written in CPS
@@ -112,30 +108,38 @@ double hypotenuse(double x, double y, auto cc) {
 }
 #+END_SRC
 
-Ignoring the convolved syntax of the resulting code, it is not hard to
+Ignoring the involved syntax of the resulting code, it is not hard to
 see that callbacks have effectively given us a way to deal with
 continuations as first-class objects.
+
+
+[fn:parameterize] It would be more correct to say "abstracting over the
+free variables of =expr=". Or even "performing a [[https://matt.might.net/articles/closure-conversion/][closure conversion]]",
+but "parameterizing" is more widely used in the C++ ecosystem,
+therefore for the intended audience of this post (hopefully).
 
 
 Of course one does not perform all of this callback ritual for silly
 arithmetic expressions as we have done so far, but rather when the
 redex can be resolved asynchronously. In such cases it is beneficial
 to place the callback in a data structure (queue) so that the program
-can do other stuff while the redex is executed.  Once completion of
-the redex is signaled (somehow) and the result is gathered (somehow),
-the stored callback can be retrived and applied to the result of the
-redex.
+can do other stuff while the redex is being resolved.  Once completion
+of the redex is signaled (somehow) and the result is gathered
+(somehow), the stored callback can be retrived and applied to the
+result of the redex.
 
 ** What about =main=?
 <<subsec:what-about-main>>
 
 In the ideal CPS world, everything in a program that is written in CPS
-takes these callback arguments (there can be more than one callback,
-see (tbd-link)Example 4 and apply the CPS transform).  But most of us
-have to deal with =main= being the entry point of our programs.  The
-signature of =main= cannot be modified, putting it at odds with our
-idealized CPS world.  The solution is simple: =main= acts as a barrier
-between the CPS world and the direct style world.
+takes these callback arguments.  In practice this is rarely the case,
+because most of us have to deal with =main= being the entrypoint of
+our programs.  The signature of =main= cannot be modified, so =main=
+being the entrypoint is at odds with our ideal CPS world.
+
+
+The solution is simple: use =main= as a barrier between the CPS world
+and the direct style world.
 
 #+NAME: listing:main-for-cps
 #+CAPTION: Bridging CPS and direct style in =main=
@@ -149,3 +153,16 @@ void main() {
 
 Breaking the ideal CPS world feels a bit dirty.  This is C++, we
 should be used to this feeling.
+
+* Next steps
+
+In this post we have given a supreficial understanding of the
+structure of Continuation Passing Style and how it allows us to
+represent continuations as objects of the language (see [[sec:recommended-material][Recommended
+material]] for more in depth discussions of CPS).  Throughout the next
+couple of posts we will apply two more program transformations, each
+providing the features that will ultimately lead us to a simplified
+=std::execution= model.
+
+* Recommended material
+<<sec:recommended-material>>

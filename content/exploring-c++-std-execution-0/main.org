@@ -288,6 +288,9 @@ runtime information.
 In this post we have settled some basics of continutions and their
 properties via examples.  The continutaions we have dealt with,
 however, are not very interesting in the sense that we cannot /do/
-anything with them.  Throughout the next few posts we will explore
-continuation passing style, from which we will develop a basic form of
-=std::execution=.
+anything with them.  Throughout the next few posts we will explore the
+*Continuation Passing Style*, from which we will develop a basic form
+of =std::execution=.
+
+
+* Recommended material
