@@ -21,28 +21,25 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#orge358080">Continuation Passing Style</a>
+<li><a href="#orgc1eb849">Continuation Passing Style</a>
 <ul>
-<li><a href="#orgef229f7">Continuations represented by objects</a></li>
-<li><a href="#org6bee003">What about <code>main</code>?</a></li>
+<li><a href="#orgf70dfc6">What about <code>main</code>?</a></li>
 </ul>
 </li>
+<li><a href="#org0e0c868">Next steps</a></li>
+<li><a href="#orged8285b">Recommended material</a></li>
 </ul>
 </div>
 </div>
-<div id="outline-container-orge358080" class="outline-2">
-<h2 id="orge358080">Continuation Passing Style</h2>
-<div class="outline-text-2" id="text-orge358080">
 <p>
-Continuations as shown in the examples of <a href="file:///home/runner/u/juarez-gonza.github.io/content/exploring-c++-std-execution-0/main.html">the previous entry of this
-series</a> are not very interesting.  They are useful to discuss the
-basics of continuations, but so far we cannot really <i>do</i> anything
-with them.
+Continuations in the examples of <a href="file:///home/runner/u/juarez-gonza.github.io/content/exploring-c++-std-execution-0/main.html">the previous entry of this series</a> are
+not very interesting.  They were useful back then to discuss the
+basics of continuations, but we cannot really <i>do</i> anything
+interesting with them at this point.
 </p>
-</div>
-<div id="outline-container-orgef229f7" class="outline-3">
-<h3 id="orgef229f7">Continuations represented by objects</h3>
-<div class="outline-text-3" id="text-orgef229f7">
+<div id="outline-container-orgc1eb849" class="outline-2">
+<h2 id="orgc1eb849">Continuation Passing Style</h2>
+<div class="outline-text-2" id="text-orgc1eb849">
 <p>
 More concretely, C++ has no language construct that allows us to treat
 continuations as any other kind of object in the language (some
@@ -63,24 +60,23 @@ the following algorithm:
 </p>
 
 <ol class="org-ol">
-<li>Choose some expression in the program and consider an execution
-state where this expression is the redex.</li>
-<li><a id="org6758a55"></a>Replace the redex in the original code by a
-<b>CPS function</b> (see Listing <a href="#org4e284d1">1</a>). This
-function:
+<li>Choose some expression <code>expr</code> in the program and consider an
+execution state where <code>expr</code> is the redex.</li>
+<li><a id="orgf963eab"></a>From <code>expr</code>, write a <b>CPS function</b> (see
+Listing <a href="#orgdfc7601">1</a>).  This is a function that:
 <ol class="org-ol">
-<li>Takes the parameters needed to execute the redex, referred to as
-<b>redex data</b>.</li>
-<li>Takes one extra invocable parameter per continuation, together
-referred to as <b>callbacks</b>.</li>
+<li>Parameterizes<sup><a id="fnr.parameterize" class="footref" href="#fn.parameterize" role="doc-backlink">1</a></sup> the data on which <code>expr</code> depends,
+referred to as <b>redex data</b>.</li>
+<li>Takes one extra invocable parameter per continuation associated
+to <code>expr</code> in the original code, together referred to as
+<b>callbacks</b>.</li>
 <li>Applies <i>only one</i> of the callbacks to the result of the
-evaluation of the original redex (making use of redex data).</li>
+evaluation <code>expr</code>.</li>
 </ol></li>
 </ol>
 
-
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 1: </span>Direct style to Continuation Passing Style: Callee</label><pre class="src src-C++" id="org4e284d1"><span class="org-comment-delimiter">// </span><span class="org-comment">Original code: Direct Style
+<label class="org-src-name"><span class="listing-number">Listing 1: </span>Direct style to Continuation Passing Style: Callee</label><pre class="src src-C++" id="orgdfc7601"><span class="org-comment-delimiter">// </span><span class="org-comment">Original code: Direct Style
 </span><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> x * x; }
 
 <span class="org-comment-delimiter">// </span><span class="org-comment">After step 3: Continuation Passing Style
@@ -90,18 +86,19 @@ evaluation of the original redex (making use of redex data).</li>
 
 
 <ol class="org-ol">
-<li value="3">Invoke the CPS function with the arguments that allow the execution
-of the redex and one lambda per callback argument. Each lambda is
-associated to one of the continuations in the original code.  If
-the associated continuation is empty, then the body of the lambda
-just returns its argument (i.e., it is the identity function).  Otherwise, the body of the lambda
-corresponds to the steps of the associated continuation (see
-Listing <a href="#org3b0eba1">2</a>).</li>
+<li value="3">Applies the CPS function to the data of <code>expr</code> that was
+parameterized by the CPS function, and to one lambda per callback
+parameter of the CPS function. Each lambda is associated to one of
+the continuations in the original code.  If the associated
+continuation is empty, then the body of the lambda just returns its
+argument (i.e. it is the identity function).  Otherwise, the body
+of the lambda corresponds to the steps of the associated
+continuation (see Listing <a href="#org7b6d1f6">2</a>).</li>
 </ol>
 
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 2: </span>Direct style to Continuation Passing Style: Caller</label><pre class="src src-C++" id="org3b0eba1"><span class="org-comment-delimiter">// </span><span class="org-comment">Original code: Direct Style
+<label class="org-src-name"><span class="listing-number">Listing 2: </span>Direct style to Continuation Passing Style: Caller</label><pre class="src src-C++" id="org7b6d1f6"><span class="org-comment-delimiter">// </span><span class="org-comment">Original code: Direct Style
 </span><span class="org-keyword">auto</span> <span class="org-variable-name">sqx</span> = sq(x);
 <span class="org-keyword">return</span> foo(sqx);
 
@@ -112,18 +109,18 @@ Listing <a href="#org3b0eba1">2</a>).</li>
 
 
 <ol class="org-ol">
-<li value="4"><a id="orgce03e13"></a> For each non-identity lambda created
-in step 4, repeat from step 2 using as redex the first statement of
-the lambda.</li>
+<li value="4"><a id="org2b5be09"></a> For each non-identity lambda created
+in step 4, repeat from step 2 using as <code>expr</code> the first statement
+of the lambda.</li>
 </ol>
 
 <p>
-To illustrate the iterative nature of the CPS transform (<a href="#orgce03e13">step 4</a>),
+To illustrate the iterative nature of the CPS transform (<a href="#org2b5be09">step 4</a>),
 consider the following example:
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 3: </span>Hypotenuse function written in direct style</label><pre class="src src-C++" id="orga920413"><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> x * x; }
+<label class="org-src-name"><span class="listing-number">Listing 3: </span>Hypotenuse function written in direct style</label><pre class="src src-C++" id="orgaa99770"><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> x * x; }
 <span class="org-type">double</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) { <span class="org-keyword">return</span> x + y; }
 <span class="org-type">double</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>) { <span class="org-keyword">return</span> sqrt(x); }
 <span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>) {
@@ -136,11 +133,11 @@ consider the following example:
 </div>
 
 <p>
-The CPS transform yields
+A few iterations of the CPS transform yield
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 4: </span>Hypotenuse function written in CPS</label><pre class="src src-C++" id="orgb0bb20f"><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }
+<label class="org-src-name"><span class="listing-number">Listing 4: </span>Hypotenuse function written in CPS</label><pre class="src src-C++" id="orgfc91e0e"><span class="org-type">double</span> <span class="org-function-name">sq</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x * x); }
 <span class="org-type">double</span> <span class="org-function-name">add</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(x + y); }
 <span class="org-type">double</span> <span class="org-function-name">sqr</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) { <span class="org-keyword">return</span> cc(sqrt(x)); }
 <span class="org-type">double</span> <span class="org-function-name">hypotenuse</span>(<span class="org-type">double</span> <span class="org-variable-name">x</span>, <span class="org-type">double</span> <span class="org-variable-name">y</span>, <span class="org-keyword">auto</span> <span class="org-variable-name">cc</span>) {
@@ -156,7 +153,7 @@ The CPS transform yields
 </div>
 
 <p>
-Ignoring the convolved syntax of the resulting code, it is not hard to
+Ignoring the involved syntax of the resulting code, it is not hard to
 see that callbacks have effectively given us a way to deal with
 continuations as first-class objects.
 </p>
@@ -167,32 +164,35 @@ Of course one does not perform all of this callback ritual for silly
 arithmetic expressions as we have done so far, but rather when the
 redex can be resolved asynchronously. In such cases it is beneficial
 to place the callback in a data structure (queue) so that the program
-can do other stuff while the redex is executed.  Once completion of
-the redex is signaled (somehow) and the result is gathered (somehow),
-the stored callback can be retrived and applied to the result of the
-redex.
+can do other stuff while the redex is being resolved.  Once completion
+of the redex is signaled (somehow) and the result is gathered
+(somehow), the stored callback can be retrived and applied to the
+result of the redex.
 </p>
 </div>
-</div>
-<div id="outline-container-org6bee003" class="outline-3">
-<h3 id="org6bee003">What about <code>main</code>?</h3>
-<div class="outline-text-3" id="text-org6bee003">
+<div id="outline-container-orgf70dfc6" class="outline-3">
+<h3 id="orgf70dfc6">What about <code>main</code>?</h3>
+<div class="outline-text-3" id="text-orgf70dfc6">
 <p>
-<a id="org0d75633"></a>
+<a id="org541d2cc"></a>
 </p>
 
 <p>
 In the ideal CPS world, everything in a program that is written in CPS
-takes these callback arguments (there can be more than one callback,
-see (tbd-link)Example 4 and apply the CPS transform).  But most of us
-have to deal with <code>main</code> being the entry point of our programs.  The
-signature of <code>main</code> cannot be modified, putting it at odds with our
-idealized CPS world.  The solution is simple: <code>main</code> acts as a barrier
-between the CPS world and the direct style world.
+takes these callback arguments.  In practice this is rarely the case,
+because most of us have to deal with <code>main</code> being the entrypoint of
+our programs.  The signature of <code>main</code> cannot be modified, so <code>main</code>
+being the entrypoint is at odds with our ideal CPS world.
+</p>
+
+
+<p>
+The solution is simple: use <code>main</code> as a barrier between the CPS world
+and the direct style world.
 </p>
 
 <div class="org-src-container">
-<label class="org-src-name"><span class="listing-number">Listing 5: </span>Bridging CPS and direct style in <code>main</code></label><pre class="src src-C++" id="org6648bee"><span class="org-type">void</span> <span class="org-function-name">main</span>() {
+<label class="org-src-name"><span class="listing-number">Listing 5: </span>Bridging CPS and direct style in <code>main</code></label><pre class="src src-C++" id="org5c6d52d"><span class="org-type">void</span> <span class="org-function-name">main</span>() {
   <span class="org-constant">std</span>::<span class="org-type">optional</span>&lt;<span class="org-type">double</span>&gt; <span class="org-variable-name">result</span>;
   hypotenuse(2.0, 3.0, [&amp;](<span class="org-type">double</span> <span class="org-variable-name">res</span>) { result = res; });
   <span class="org-constant">std</span>::println(<span class="org-string">"{}"</span>, *result);
@@ -207,7 +207,42 @@ should be used to this feeling.
 </div>
 </div>
 </div>
+<div id="outline-container-org0e0c868" class="outline-2">
+<h2 id="org0e0c868">Next steps</h2>
+<div class="outline-text-2" id="text-org0e0c868">
+<p>
+In this post we have given a supreficial understanding of the
+structure of Continuation Passing Style and how it allows us to
+represent continuations as objects of the language (see <a href="#org2396b95">Recommended
+material</a> for more in depth discussions of CPS).  Throughout the next
+couple of posts we will apply two more program transformations, each
+providing the features that will ultimately lead us to a simplified
+<code>std::execution</code> model.
+</p>
 </div>
+</div>
+<div id="outline-container-orged8285b" class="outline-2">
+<h2 id="orged8285b">Recommended material</h2>
+<div class="outline-text-2" id="text-orged8285b">
+<p>
+<a id="org2396b95"></a>
+</p>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.parameterize" class="footnum" href="#fnr.parameterize" role="doc-backlink">1</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+It would be more correct to say "abstracting over the
+free variables of <code>expr</code>". Or even "performing a <a href="https://matt.might.net/articles/closure-conversion/">closure conversion</a>",
+but "parameterizing" is more widely used in the C++ ecosystem,
+therefore for the intended audience of this post (hopefully).
+</p></div></div>
+
+
+</div>
+</div></div>
 <div id="postamble" class="status">
 <p class="creator"><a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.2 (<a href="https://orgmode.org">Org</a> mode 9.7.11)</p>
 </div>
